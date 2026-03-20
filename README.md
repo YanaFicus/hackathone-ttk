@@ -1,73 +1,76 @@
-# React + TypeScript + Vite
+# 📌 My React App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Простой проект на **React** с **React Router DOM**, сборкой через **Bun** и стилями на **Tailwind CSS v4**.  
+Можно запускать локально или деплоить онлайн через **GitHub Pages** или **Vercel**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ⚡ Требования
 
-## React Compiler
+- [Bun](https://bun.sh/) v1.0+  
+- Git (для клонирования репозитория)  
+- Браузер
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠 Установка и запуск локально
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Клонируем репозиторий:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone https://github.com/USERNAME/REPO.git
+cd REPO
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Устанавливаем зависимости:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+bun install
 ```
+
+Запуск dev-сервера:
+
+```bash
+bun dev
+```
+
+Открой браузер и перейди на: http://localhost:5173
+
+## 📦 Структура проекта
+hackathone-ttk/
+├─ src/
+│  ├─ index.jsx         # Точка входа
+│  ├─ App.jsx           # Главный компонент
+│  ├─ pages/            # Страницы приложения
+│  │  ├─ Home.jsx
+│  │  └─ About.jsx
+│  └─ index.css         # Tailwind v4 + preflight
+├─ bun.lockb            # lock-файл Bun
+├─ tailwind.config.js   # Настройка Tailwind
+└─ package.json
+
+## 🎨 Tailwind CSS v4
+
+В src/index.css подключено:
+
+```css
+@import "tailwindcss/preflight"; /* сброс дефолтных стилей браузера */
+@tailwind utilities;             /* все утилиты Tailwind */
+```
+
+## 🔗 React Router DOM
+
+В проекте используется <BrowserRouter> для маршрутизации
+
+Примеры маршрутов:
+
+/       -> Home
+/about  -> About
+
+## ✅ Советы
+
+Для новых зависимостей используйте bun add package_name
+
+TypeScript: bun add -d @types/react @types/react-dom @types/react-router-dom
+
+С Tailwind v4 preflight уже сбрасывает дефолтные стили браузера
