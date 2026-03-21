@@ -1,11 +1,81 @@
 import { useNavigate } from "react-router-dom";
+import { useLogoutMutation } from "../services/auth/authApi"; // RTK Query
+import { useEffect, useState } from "react";
+import { base64UrlDecode } from "../utils/base64UrlDecode";
+
+// Тип данных пользователя
+interface User {
+  login: string;
+  fullName: string;
+  roles: string[];
+}
+
+const roleMap: Record<number, string> = {
+  1: "Пользователь",
+  2: "Вещатель",
+  4: "Администратор",
+};
 
 export default function Header() {
   const navigate = useNavigate();
+  const [logout] = useLogoutMutation();
+  const [user, setUser] = useState<User | null>(null);
+  const isAdmin = user?.roles.includes("Администратор") ?? false;
+  const isBroadcaster = user?.roles.includes("Вещатель") ?? false;
 
-  const handleLogout = () => {
-    // Здесь будет логика выхода
-    navigate("/login");
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      queueMicrotask(() => setUser(null));
+      return;
+    }
+
+    const decodeUser = () => {
+      try {
+        const parts = token.split(".");
+        if (parts.length !== 3) throw new Error("Invalid token format");
+
+        const payload = JSON.parse(base64UrlDecode(parts[1]));
+
+        const login = payload.login || payload.unique_name || payload.sub || "Unknown";
+        let roles: string[] = [];
+
+        if (Array.isArray(payload.roles)) {
+          roles = payload.roles.map((r: number) => roleMap[r]).filter(Boolean);
+        } else if (typeof payload.role === "string") {
+          roles = payload.role === "User" ? ["Пользователь"] :
+                  payload.role === "Broadcaster" ? ["Вещатель"] :
+                  payload.role === "Admin" ? ["Администратор"] : [payload.role];
+        }
+
+        if (!roles.length) roles = ["Пользователь"];
+        const fullName = payload.fullName || payload.FullName || login;
+
+        queueMicrotask(() => setUser({ login, fullName, roles }));
+      } catch (e) {
+        console.error("Ошибка декодирования токена:", e);
+        queueMicrotask(() => setUser(null));
+      }
+    };
+
+    decodeUser();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      setUser(null);
+      navigate("/login");
+    } catch (e) {
+      console.error("Error during logout:", e);
+      // Даже если API выхода не сработал, очищаем локальное состояние
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      setUser(null);
+      navigate("/login");
+    }
   };
 
   return (
@@ -47,70 +117,54 @@ export default function Header() {
               >
                 Главная
               </button>
-              <button
-                onClick={() => navigate("/broadcaster")}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Вещатель
-              </button>
-              <button
-                onClick={() => navigate("/administration")}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Администрирование
-              </button>
+              {isBroadcaster && (
+                <button
+                  onClick={() => navigate("/broadcaster")}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Вещатель
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => navigate("/administration")}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Администрирование
+                </button>
+              )}
             </nav>
           </div>
 
           {/* Правая часть: Информация о пользователе и выход */}
           <div className="flex items-center gap-4">
-            {/* Роли пользователя */}
-            <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="text-gray-500"
-              >
-                <path
-                  d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                  fill="currentColor"
-                />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">admin</span>
-              <div className="flex gap-1">
-                <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded">
-                  Администратор
-                </span>
-                <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">
-                  Вещатель
-                </span>
-                <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-                  Пользователь
-                </span>
-              </div>
-            </div>
+            {user ? (
+              <div className="flex items-center gap-4">
+                <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">{user.login}</span>
+                  <div className="flex gap-1">
+                    {user.roles.map((role) => {
+                      let color = "bg-blue-100 text-blue-700";
+                      if (role === "Администратор") color = "bg-red-100 text-red-700";
+                      if (role === "Вещатель") color = "bg-purple-100 text-purple-700";
+                      return (
+                        <span key={role} className={`px-2 py-0.5 text-xs font-medium rounded ${color}`}>
+                          {role}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
 
-            {/* Кнопка выхода */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              <span className="hidden sm:inline">Выйти</span>
-            </button>
+                <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+                  Выйти
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => navigate("/login")} className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+                Войти
+              </button>
+            )}
           </div>
         </div>
       </div>

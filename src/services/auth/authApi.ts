@@ -47,7 +47,7 @@ export const authApi = createApi({
           const { data } = await queryFulfilled;
 
           // сохраняем токены
-          localStorage.setItem("accessToken", data.accessToken);
+          localStorage.setItem("accessToken", data.token);
           localStorage.setItem("refreshToken", data.refreshToken);
         } catch (e) {
           console.error("Login error", e);
@@ -66,7 +66,7 @@ export const authApi = createApi({
         try {
           const { data } = await queryFulfilled;
 
-          localStorage.setItem("accessToken", data.accessToken);
+          localStorage.setItem("accessToken", data.token);
         } catch (e) {
           console.error("Refresh error", e);
         }

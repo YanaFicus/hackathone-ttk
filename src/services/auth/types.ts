@@ -15,6 +15,6 @@ export interface RefreshRequest {
 }
 
 export interface AuthResponse {
-  accessToken: string;
+  token: string;
   refreshToken: string;
 }

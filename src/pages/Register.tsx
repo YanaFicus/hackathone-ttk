@@ -76,7 +76,7 @@ export default function RegisterPage() {
     e.preventDefault();
     try {
       const result = await register(formData).unwrap();
-      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("accessToken", result.token);
       localStorage.setItem("refreshToken", result.refreshToken);
       console.log("Registered user:", result);
       navigate("/");
