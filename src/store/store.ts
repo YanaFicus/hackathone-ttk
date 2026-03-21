@@ -1,10 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { apiSlice } from '../services/apiSlice';
+import { authApi } from '../services/auth/authApi';
+import { adminApi } from '../services/admin/adminApi';
 
 export const store = configureStore({
   reducer: {
-    [apiSlice.reducerPath]: apiSlice.reducer,
+    [authApi.reducerPath]: authApi.reducer,
+    [adminApi.reducerPath]: adminApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(apiSlice.middleware),
+    getDefaultMiddleware().concat(authApi.middleware, adminApi.middleware),
 });
