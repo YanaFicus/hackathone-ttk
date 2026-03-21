@@ -3,8 +3,9 @@ import Home from "./pages/Home";
 import About from "./pages/About";
 import Login from "./pages/Login";
 import StreamPlayer from "./pages/StreamPlayer";
-import NotFoundPage from "./pages/404Page";
+import BroadcasterPanel from "./pages/BroadcasterPanel";
 import RegisterPage from "./pages/Register";
+import NotFoundPage from "./pages/404Page";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/" element={<StreamPlayer />} />
+      <Route path="/broadcaster" element={<BroadcasterPanel />} />
       <Route path="/home" element={<Home />} />
       <Route path="/about" element={<About />} />
       <Route path="*" element={<NotFoundPage />} />
