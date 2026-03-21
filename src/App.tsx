@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Login from "./pages/Login";
@@ -8,27 +8,32 @@ import RegisterPage from "./pages/Register";
 import NotFoundPage from "./pages/404Page";
 import Administration from "./pages/Administration";
 import type { User } from "./types/user";
-import { useState } from "react";
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const [user] = useState<User | null>(null);
-  const navigate = useNavigate();
-  
-  const isAdmin = user?.roles.includes("Администратор") ?? false;
-  
-  if (!user) navigate("/");
-  
+  const savedUser = localStorage.getItem("user");
+
+  if (!savedUser) {
+    return <Navigate to="/" replace />;
+  }
+
+  const user: User = JSON.parse(savedUser);
+
+  const isAdmin = user.roles.includes(2);
+
   return isAdmin ? children : <Navigate to="/" replace />;
 }
 
 function BroadcasterRoute({ children }: { children: React.ReactNode }) {
-  const [user] = useState<User | null>(null);
-  const navigate = useNavigate();
-  
-  const isBroadcaster = user?.roles.includes("Вещатель") ?? false;
-  
-  if (!user) navigate("/");
-  
+  const savedUser = localStorage.getItem("user");
+
+  if (!savedUser) {
+    return <Navigate to="/" replace />;
+  }
+
+  const user: User = JSON.parse(savedUser);
+
+  const isBroadcaster = user.roles.includes(1);
+
   return isBroadcaster ? children : <Navigate to="/" replace />;
 }
 

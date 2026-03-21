@@ -26,8 +26,6 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       const result = await login(formData).unwrap();
-      localStorage.setItem("accessToken", result.token);
-      localStorage.setItem("refreshToken", result.refreshToken);
       console.log("Logged in user:", result);
       navigate('/');
     } catch (err) {

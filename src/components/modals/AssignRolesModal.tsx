@@ -4,6 +4,20 @@ import type { User } from "../../types/user";
 
 type RoleKey = "user" | "broadcaster" | "administrator";
 
+// Маппинг числовых ролей в строковые ключи
+const roleCodeToKey: Record<number, RoleKey> = {
+  0: "user",
+  1: "broadcaster",
+  2: "administrator",
+};
+
+// Маппинг строковых ключей в числовые роли
+const roleKeyToCode: Record<RoleKey, number> = {
+  user: 0,
+  broadcaster: 1,
+  administrator: 2,
+};
+
 interface SelectedRoles {
   user: boolean;
   broadcaster: boolean;
@@ -22,18 +36,29 @@ export default function AssignRolesModal({
   onSave: (user: User) => void;
 }) {
   const getInitialRoles = (user: User): SelectedRoles => {
-    const roles = user.roles.map((r) => r.toLowerCase());
-
-    return {
-      user: roles.includes("user"),
-      broadcaster: roles.includes("broadcaster"),
-      administrator: roles.includes("administrator"),
+    // Инициализируем все роли как false
+    const initial: SelectedRoles = {
+      user: false,
+      broadcaster: false,
+      administrator: false,
     };
+    
+    // Проходим по числовым ролям пользователя и устанавливаем соответствующие ключи
+    user.roles.forEach((roleCode) => {
+      const roleKey = roleCodeToKey[roleCode];
+      if (roleKey) {
+        initial[roleKey] = true;
+      }
+    });
+    
+    console.log("Initial roles:", initial); // Для отладки
+    return initial;
   };
 
   const [selectedRoles, setSelectedRoles] = useState<SelectedRoles>(
     getInitialRoles(user),
   );
+
   const handleRoleToggle = (role: RoleKey) => {
     setSelectedRoles((prev) => ({
       ...prev,
@@ -42,17 +67,21 @@ export default function AssignRolesModal({
   };
 
   const handleSubmit = () => {
-    const roles: string[] = [];
-
-    if (selectedRoles.user) roles.push("user");
-    if (selectedRoles.broadcaster) roles.push("broadcaster");
-    if (selectedRoles.administrator) roles.push("administrator");
+    // Преобразуем выбранные роли в массив чисел
+    const roles: number[] = [];
+    
+    if (selectedRoles.user) roles.push(roleKeyToCode.user);
+    if (selectedRoles.broadcaster) roles.push(roleKeyToCode.broadcaster);
+    if (selectedRoles.administrator) roles.push(roleKeyToCode.administrator);
 
     if (roles.length === 0) {
       alert("Пользователь должен иметь хотя бы одну роль");
       return;
     }
 
+    console.log("Saving roles:", roles); // Для отладки
+    
+    // Сохраняем обновленного пользователя с новыми ролями
     onSave({ ...user, roles });
     onClose();
   };
@@ -178,7 +207,7 @@ export default function AssignRolesModal({
         {/* Roles */}
         <div className="space-y-3">
           {roles.map((role) => {
-            const isSelected = selectedRoles[role.key as RoleKey];
+            const isSelected = selectedRoles[role.key];
             const classes = getColorClasses(role.color, isSelected);
 
             return (
@@ -225,7 +254,7 @@ export default function AssignRolesModal({
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-900">
             <strong>Примечание:</strong> Только администраторы могут назначать
-            роли "Broadcaster" и "Administrator". Пользователь должен иметь хотя
+            роли "Вещатель" и "Администратор". Пользователь должен иметь хотя
             бы одну назначенную роль.
           </p>
         </div>

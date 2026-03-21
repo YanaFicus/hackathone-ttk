@@ -6,16 +6,43 @@ import ChangePasswordModal from "../components/modals/ChangePasswordModal";
 import AssignRolesModal from "../components/modals/AssignRolesModal";
 import DeleteUserModal from "../components/modals/DeleteUserModal";
 import type { User, ChangePasswordData } from "../types/user";
+import { useGetUsersQuery } from "../services/admin/adminApi";
+import {
+  useUpdateUserMutation,
+  useChangePasswordMutation,
+  useDeleteUserMutation,
+} from "../services/admin/adminApi";
 
 type ModalType = "edit" | "password" | "roles" | "delete";
 
-const roleLabels: Record<string, string> = {
-  administrator: "Администратор",
-  broadcaster: "Вещатель",
-  user: "Пользователь",
+// Маппинг ролей
+const codeToLabel: Record<number, string> = {
+  0: "Пользователь",
+  1: "Вещатель",
+  2: "Администратор",
+};
+
+const roleFilterToCode: Record<string, number> = {
+  user: 0,
+  broadcaster: 1,
+  administrator: 2,
 };
 
 export default function Administration() {
+  const { data, isLoading, refetch } = useGetUsersQuery({});
+  const [updateUser] = useUpdateUserMutation();
+  const [changePassword] = useChangePasswordMutation();
+  const [deleteUser] = useDeleteUserMutation();
+
+  // Преобразуем данные с сервера в формат User
+  const users: User[] = (data || []).map((u) => ({
+    id: u.id,
+    username: u.login,
+    fullName: u.fullName,
+    roles: u.roles, // Теперь roles уже массив чисел
+    registrationDate: u.registeredAtUtc,
+  }));
+
   // Состояния фильтров
   const [filters, setFilters] = useState({
     username: "",
@@ -36,45 +63,6 @@ export default function Administration() {
 
   const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
 
-  // Демо-данные пользователей
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 1,
-      username: "admin",
-      fullName: "Администратор Системы",
-      roles: ["administrator", "broadcaster", "user"],
-      registrationDate: "2024-01-15",
-    },
-    {
-      id: 2,
-      username: "broadcaster",
-      fullName: "Иван Петров",
-      roles: ["broadcaster", "user"],
-      registrationDate: "2024-02-20",
-    },
-    {
-      id: 3,
-      username: "user",
-      fullName: "Мария Иванова",
-      roles: ["user"],
-      registrationDate: "2024-03-10",
-    },
-    {
-      id: 4,
-      username: "alexsmith",
-      fullName: "Алексей Смирнов",
-      roles: ["user"],
-      registrationDate: "2024-03-15",
-    },
-    {
-      id: 5,
-      username: "broadcaster2",
-      fullName: "Елена Васильева",
-      roles: ["broadcaster", "user"],
-      registrationDate: "2024-03-18",
-    },
-  ]);
-
   // Фильтрация пользователей
   const filteredUsers = users.filter((user) => {
     const matchesUsername =
@@ -83,10 +71,36 @@ export default function Administration() {
     const matchesFullName =
       filters.fullName === "" ||
       user.fullName.toLowerCase().includes(filters.fullName.toLowerCase());
-    const matchesRole =
-      filters.role === "all" || user.roles.includes(filters.role);
+    
+    // Фильтрация по роли
+    let matchesRole = filters.role === "all";
+    if (!matchesRole && filters.role in roleFilterToCode) {
+      const roleCode = roleFilterToCode[filters.role];
+      matchesRole = user.roles.includes(roleCode);
+    }
 
-    return matchesUsername && matchesFullName && matchesRole;
+    // Фильтрация по дате регистрации
+    let matchesRegistrationFrom = true;
+    if (filters.registrationFrom) {
+      const parts = filters.registrationFrom.split('.');
+      if (parts.length === 3) {
+        const filterDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        const userDate = new Date(user.registrationDate);
+        matchesRegistrationFrom = userDate >= filterDate;
+      }
+    }
+
+    let matchesRegistrationTo = true;
+    if (filters.registrationTo) {
+      const parts = filters.registrationTo.split('.');
+      if (parts.length === 3) {
+        const filterDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        const userDate = new Date(user.registrationDate);
+        matchesRegistrationTo = userDate <= filterDate;
+      }
+    }
+
+    return matchesUsername && matchesFullName && matchesRole && matchesRegistrationFrom && matchesRegistrationTo;
   });
 
   // Обработчики изменений фильтров
@@ -96,10 +110,9 @@ export default function Administration() {
       [key]: value,
     }));
 
-    // Показываем кнопку Clear all если есть активные фильтры
     const newFilters = { ...filters, [key]: value };
     const hasActiveFilters = Object.values(newFilters).some(
-      (val) => val !== "",
+      (val) => val !== "" && val !== "all"
     );
     setShowClearAll(hasActiveFilters);
   };
@@ -125,36 +138,90 @@ export default function Administration() {
     setSelectedUser(undefined);
   };
 
-  const handleEditUser = (updatedUser: User) => {
-    setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-    console.log("User updated:", updatedUser);
+  const handleEditUser = async (updatedUser: User) => {
+    try {
+      await updateUser({
+        id: updatedUser.id.toString(),
+        data: {
+          login: updatedUser.username,
+          fullName: updatedUser.fullName,
+          roles: updatedUser.roles, // Передаем массив чисел
+        },
+      }).unwrap();
+      
+      console.log("User updated:", updatedUser);
+      refetch();
+      closeModal("edit");
+      alert("Пользователь успешно обновлён!");
+    } catch (err) {
+      console.error("Error updating user:", err);
+      alert("Ошибка при обновлении пользователя");
+    }
   };
 
-  const handleChangePassword = ({ userId, password }: ChangePasswordData) => {
-    console.log("Password changed for user:", userId, password);
-    alert("Пароль успешно изменён!");
+  const handleChangePassword = async ({ userId, password }: ChangePasswordData) => {
+    try {
+      await changePassword({
+        id: userId.toString(),
+        data: {
+          newPassword: password,
+          confirmPassword: password,
+        },
+      }).unwrap();
+      
+      console.log("Password changed for user:", userId);
+      alert("Пароль успешно изменён!");
+      closeModal("password");
+    } catch (err) {
+      console.error("Error changing password:", err);
+      alert("Ошибка при смене пароля");
+    }
   };
 
-  const handleAssignRoles = (updatedUser: User) => {
-    setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-    console.log("Roles assigned:", updatedUser);
+  const handleAssignRoles = async (updatedUser: User) => {
+    try {
+      await updateUser({
+        id: updatedUser.id.toString(),
+        data: {
+          login: updatedUser.username,
+          fullName: updatedUser.fullName,
+          roles: updatedUser.roles,
+        },
+      }).unwrap();
+      
+      console.log("Roles assigned:", updatedUser);
+      refetch();
+      closeModal("roles");
+      alert("Роли успешно назначены!");
+    } catch (err) {
+      console.error("Error assigning roles:", err);
+      alert("Ошибка при назначении ролей");
+    }
   };
 
-  const handleDeleteUser = (userId: number) => {
-    setUsers(users.filter((u) => u.id !== userId));
-    console.log("User deleted:", userId);
+  const handleDeleteUser = async (userId: string) => {
+    if (window.confirm("Вы уверены, что хотите удалить этого пользователя?")) {
+      try {
+        await deleteUser({ id: userId.toString() }).unwrap();
+        console.log("User deleted:", userId);
+        refetch();
+        closeModal("delete");
+        alert("Пользователь успешно удалён!");
+      } catch (err) {
+        console.error("Error deleting user:", err);
+        alert("Ошибка при удалении пользователя");
+      }
+    }
   };
 
   // Получение цвета для роли
-  const getRoleColor = (role: string) => {
-    const normalizedRole = role.toLowerCase();
-
-    switch (normalizedRole) {
-      case "administrator":
+  const getRoleColor = (roleName: string) => {
+    switch (roleName) {
+      case "Администратор":
         return "bg-red-100 text-red-700 border-red-200";
-      case "broadcaster":
+      case "Вещатель":
         return "bg-purple-100 text-purple-700 border-purple-200";
-      case "user":
+      case "Пользователь":
         return "bg-blue-100 text-blue-700 border-blue-200";
       default:
         return "bg-gray-100 text-gray-700 border-gray-200";
@@ -163,6 +230,7 @@ export default function Administration() {
 
   // Форматирование даты
   const formatDate = (dateString: string) => {
+    if (!dateString) return "Дата не указана";
     const date = new Date(dateString);
     const options: DateTimeFormatOptions = {
       year: "numeric",
@@ -171,6 +239,20 @@ export default function Administration() {
     };
     return date.toLocaleDateString("ru-RU", options);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-gray-600">Загрузка пользователей...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -196,7 +278,7 @@ export default function Administration() {
                 fill="none"
               />
             </svg>
-            <h1 className="text-3xl font-bold text-gray-900">Эдминистратор</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Администрирование</h1>
           </div>
           <p className="text-gray-600">
             Управляй пользователями, ролями и настройками
@@ -340,6 +422,9 @@ export default function Administration() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Никнейм пользователя
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
@@ -363,6 +448,11 @@ export default function Administration() {
                     className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 font-mono">
+                        {user.id.toString().substring(0, 8)}...
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-medium text-gray-900">
                         {user.username}
                       </span>
@@ -374,14 +464,14 @@ export default function Administration() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1.5">
-                        {user.roles.map((role) => {
-                          const normalizedRole = role.toLowerCase();
+                        {user.roles.map((roleCode) => {
+                          const roleName = codeToLabel[roleCode];
                           return (
                             <span
-                              key={role}
-                              className={`px-2.5 py-1 text-xs font-medium rounded-md border ${getRoleColor(role)}`}
+                              key={roleCode}
+                              className={`px-2.5 py-1 text-xs font-medium rounded-md border ${getRoleColor(roleName)}`}
                             >
-                              {roleLabels[normalizedRole] || role}
+                              {roleName}
                             </span>
                           );
                         })}
@@ -394,39 +484,23 @@ export default function Administration() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Edit */}
                         <button
                           onClick={() => openModal("edit", user)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
+                          title="Редактировать"
                         >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                           </svg>
                         </button>
 
-                        {/* Grant Access */}
                         <button
                           onClick={() => openModal("password", user)}
                           className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Grant Access"
+                          title="Сменить пароль"
                         >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z" />
                             <circle cx="12" cy="13" r="3" />
                             <path d="M12 10v6" />
@@ -434,38 +508,22 @@ export default function Administration() {
                           </svg>
                         </button>
 
-                        {/* Protect */}
                         <button
                           onClick={() => openModal("roles", user)}
                           className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                          title="Protect"
+                          title="Назначить роли"
                         >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                           </svg>
                         </button>
 
-                        {/* Delete */}
                         <button
                           onClick={() => openModal("delete", user)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
+                          title="Удалить"
                         >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                             <line x1="10" y1="11" x2="10" y2="17" />
@@ -480,7 +538,6 @@ export default function Administration() {
             </table>
           </div>
 
-          {/* Pagination info */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <p className="text-sm text-gray-600">
               Показано {filteredUsers.length} из {users.length} пользователей

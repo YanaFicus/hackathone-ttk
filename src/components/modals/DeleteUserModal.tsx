@@ -1,6 +1,23 @@
 import Modal from "./Modal";
 import type { User } from "../../types/user";
 
+// Маппинг числовых ролей в строки для отображения
+const roleCodeToLabel: Record<number, string> = {
+  0: "Пользователь",
+  1: "Вещатель",
+  2: "Администратор",
+};
+
+// Цвета для ролей
+const getRoleColor = (roleCode: number): string => {
+  const colors: Record<number, string> = {
+    0: "bg-blue-100 text-blue-700",
+    1: "bg-purple-100 text-purple-700",
+    2: "bg-red-100 text-red-700",
+  };
+  return colors[roleCode] || "bg-gray-100 text-gray-700";
+};
+
 export default function DeleteUserModal({
   isOpen,
   onClose,
@@ -10,10 +27,10 @@ export default function DeleteUserModal({
   isOpen: boolean;
   onClose: () => void;
   user: User;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void; // Изменяем с number на string
 }) {
   const handleDelete = () => {
-    onDelete(user.id);
+    onDelete(user.id); // user.id уже string
     onClose();
   };
 
@@ -57,6 +74,12 @@ export default function DeleteUserModal({
         {/* User Info */}
         <div className="bg-gray-50 rounded-xl p-4 space-y-3">
           <div className="flex justify-between">
+            <span className="text-sm text-gray-600">ID пользователя:</span>
+            <span className="text-sm font-mono text-gray-900">
+              {user?.id.substring(0, 8)}...
+            </span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-sm text-gray-600">Имя пользователя:</span>
             <span className="text-sm font-medium text-gray-900">
               {user?.username}
@@ -71,23 +94,36 @@ export default function DeleteUserModal({
           <div>
             <span className="text-sm text-gray-600 block mb-2">Роли:</span>
             <div className="flex flex-wrap gap-1.5">
-              {user?.roles.map((role: string) => {
-                const colors: Record<string, string> = {
-                  Administrator: "bg-red-100 text-red-700",
-                  Broadcaster: "bg-purple-100 text-purple-700",
-                  User: "bg-blue-100 text-blue-700",
-                };
+              {user?.roles.map((roleCode: number) => {
+                const roleName = roleCodeToLabel[roleCode];
+                const colorClass = getRoleColor(roleCode);
                 return (
                   <span
-                    key={role}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-md ${colors[role] || "bg-gray-100 text-gray-700"}`}
+                    key={roleCode}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md ${colorClass}`}
                   >
-                    {role}
+                    {roleName}
                   </span>
                 );
               })}
             </div>
           </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Дата регистрации:</span>
+            <span className="text-sm text-gray-900">
+              {user?.registrationDate 
+                ? new Date(user.registrationDate).toLocaleDateString("ru-RU")
+                : "Не указана"}
+            </span>
+          </div>
+        </div>
+
+        {/* Additional Warning */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <p className="text-sm text-yellow-800">
+            <strong>Важно:</strong> Это действие необратимо. Пользователь будет
+            удалён из системы, но его данные сохранятся для аудита.
+          </p>
         </div>
 
         {/* Buttons */}

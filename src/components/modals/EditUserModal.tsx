@@ -37,6 +37,8 @@ export default function EditUserModal({
       newErrors.username = "Имя пользователя обязательно";
     } else if (formData.username.length < 3) {
       newErrors.username = "Минимум 3 символа";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      newErrors.username = "Только латинские буквы, цифры и знак подчеркивания";
     }
 
     if (!formData.fullName.trim()) {
@@ -49,8 +51,16 @@ export default function EditUserModal({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (validate()) {
-      onSave({ ...user!, ...formData });
+    if (validate() && user) {
+      // Сохраняем все поля пользователя, включая roles
+      const updatedUser: User = {
+        ...user,           // Сохраняем id, roles, registrationDate
+        username: formData.username,
+        fullName: formData.fullName,
+      };
+      
+      console.log("Updating user:", updatedUser); // Для отладки
+      onSave(updatedUser);
       onClose();
     }
   };
@@ -63,10 +73,21 @@ export default function EditUserModal({
       maxWidth="max-w-lg"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Info */}
+        <div className="bg-gray-50 px-4 py-3 rounded-lg">
+          <p className="text-sm text-gray-700">
+            Редактирование пользователя:{" "}
+            <span className="font-semibold">{user?.username}</span>
+            {user?.fullName && (
+              <span className="text-gray-500"> ({user.fullName})</span>
+            )}
+          </p>
+        </div>
+
         {/* Username */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Имя пользователя
+            Никнейм
           </label>
           <input
             type="text"
@@ -77,25 +98,13 @@ export default function EditUserModal({
             className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
               errors.username
                 ? "border-red-300 focus:border-red-500 focus:ring-red-200"
-                : "border-gray-300 focus:border-green-500 focus:ring-green-200"
+                : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
             }`}
             placeholder="Введите имя пользователя"
           />
-          {formData.username && !errors.username && (
-            <div className="flex items-center gap-1 mt-1.5 text-green-600 text-sm">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span>Валидное имя пользователя</span>
-            </div>
-          )}
+          <p className="mt-1.5 text-xs text-gray-500">
+            Латинские буквы
+          </p>
           {errors.username && (
             <p className="mt-1.5 text-sm text-red-600">{errors.username}</p>
           )}
@@ -115,29 +124,38 @@ export default function EditUserModal({
             className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
               errors.fullName
                 ? "border-red-300 focus:border-red-500 focus:ring-red-200"
-                : "border-gray-300 focus:border-green-500 focus:ring-green-200"
+                : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
             }`}
             placeholder="Введите полное имя"
           />
-          {formData.fullName && !errors.fullName && (
-            <div className="flex items-center gap-1 mt-1.5 text-green-600 text-sm">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span>Валидное полное имя</span>
-            </div>
-          )}
           {errors.fullName && (
             <p className="mt-1.5 text-sm text-red-600">{errors.fullName}</p>
           )}
         </div>
+
+        {/* Roles Info */}
+        {user?.roles && user.roles.length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-sm font-medium text-gray-700 mb-2">Текущие роли:</p>
+            <div className="flex flex-wrap gap-2">
+              {user.roles.map((roleCode) => {
+                const roleNames: Record<number, string> = {
+                  0: "Пользователь",
+                  1: "Вещатель",
+                  2: "Администратор",
+                };
+                return (
+                  <span
+                    key={roleCode}
+                    className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-200 text-gray-700"
+                  >
+                    {roleNames[roleCode]}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Buttons */}
         <div className="flex gap-3 pt-4">

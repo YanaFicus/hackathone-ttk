@@ -74,16 +74,18 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.password !== formData.confirmPassword) {
+      alert("Пароли не совпадают");
+      return;
+    }
+    
     try {
       const result = await register(formData).unwrap();
-      localStorage.setItem("accessToken", result.token);
-      localStorage.setItem("refreshToken", result.refreshToken);
       console.log("Registered user:", result);
-      navigate("/");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+      navigate('/');
+    } catch (err) {
       console.error("Registration error:", err);
-      alert(err.data?.message || "Ошибка регистрации");
+      alert("Ошибка регистрации. Попробуйте другой логин.");
     }
   };
 

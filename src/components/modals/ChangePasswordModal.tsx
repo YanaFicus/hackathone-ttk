@@ -8,7 +8,7 @@ interface PasswordErrors {
 }
 
 interface ChangePasswordData {
-  userId: number;
+  userId: string; // Изменяем с number на string (UUID)
   password: string;
 }
 
@@ -57,7 +57,7 @@ export default function ChangePasswordModal({
 
     if (validate()) {
       onSave({
-        userId: user.id,
+        userId: user.id, // user.id уже string, не нужно преобразовывать
         password: formData.newPassword,
       });
 
@@ -88,6 +88,9 @@ export default function ChangePasswordModal({
           <p className="text-sm text-gray-700">
             Смена пароля для:{" "}
             <span className="font-semibold">{user?.username}</span>
+            {user?.fullName && (
+              <span className="text-gray-500"> ({user.fullName})</span>
+            )}
           </p>
         </div>
 

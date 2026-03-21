@@ -5,18 +5,18 @@ export interface GetUsersRequest {
 }
 
 export interface UserDto {
-  id: string;
-  username: string;
+  id: string;          
+  login: string;
   fullName: string;
-  role: "Administrator" | "User" | "Broadcaster";
-  createdAt: string;
-  updatedAt: string;
+  roles: number[];     
+  registeredAtUtc: string;  
+  updatedAt?: string;  
 }
 
 export interface UpdateUserRequest {
-  username?: string;
+  login?: string;
   fullName?: string;
-  role?: "Administrator" | "User" | "Broadcaster";
+  roles?: number[];
 }
 
 export interface ChangePasswordRequest {

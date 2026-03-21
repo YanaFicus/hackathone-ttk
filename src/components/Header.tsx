@@ -1,79 +1,57 @@
 import { useNavigate } from "react-router-dom";
 import { useLogoutMutation } from "../services/auth/authApi"; // RTK Query
 import { useEffect, useState } from "react";
-import { base64UrlDecode } from "../utils/base64UrlDecode";
 
 // Тип данных пользователя
 interface User {
   login: string;
   fullName: string;
-  roles: string[];
+  roles: number[];
 }
 
 const roleMap: Record<number, string> = {
-  1: "Пользователь",
-  2: "Вещатель",
-  4: "Администратор",
+  0: "Пользователь",
+  1: "Вещатель",
+  2: "Администратор",
 };
 
 export default function Header() {
   const navigate = useNavigate();
   const [logout] = useLogoutMutation();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<{ login: string; fullName: string; roles: string[] } | null>(null);
   const isAdmin = user?.roles.includes("Администратор") ?? false;
   const isBroadcaster = user?.roles.includes("Вещатель") ?? false;
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      queueMicrotask(() => setUser(null));
-      return;
-    }
-
-    const decodeUser = () => {
+    const savedUser = localStorage.getItem("user");
+    
+    if (savedUser) {
       try {
-        const parts = token.split(".");
-        if (parts.length !== 3) throw new Error("Invalid token format");
-
-        const payload = JSON.parse(base64UrlDecode(parts[1]));
-
-        const login = payload.login || payload.unique_name || payload.sub || "Unknown";
-        let roles: string[] = [];
-
-        if (Array.isArray(payload.roles)) {
-          roles = payload.roles.map((r: number) => roleMap[r]).filter(Boolean);
-        } else if (typeof payload.role === "string") {
-          roles = payload.role === "User" ? ["Пользователь"] :
-                  payload.role === "Broadcaster" ? ["Вещатель"] :
-                  payload.role === "Admin" ? ["Администратор"] : [payload.role];
-        }
-
-        if (!roles.length) roles = ["Пользователь"];
-        const fullName = payload.fullName || payload.FullName || login;
-
-        queueMicrotask(() => setUser({ login, fullName, roles }));
+        const userData: User = JSON.parse(savedUser);
+        
+        // Преобразуем числовые роли в строковые
+        const roles = userData.roles.map((role: number) => roleMap[role]).filter(Boolean);
+        
+        setUser({
+          login: userData.login,
+          fullName: userData.fullName,
+          roles: roles.length ? roles : ["Пользователь"],
+        });
+        
+        console.log("User loaded from storage:", userData);
       } catch (e) {
-        console.error("Ошибка декодирования токена:", e);
-        queueMicrotask(() => setUser(null));
+        console.error("Error parsing user data:", e);
+        localStorage.removeItem("user");
       }
-    };
-
-    decodeUser();
+    }
   }, []);
 
   const handleLogout = async () => {
     try {
       await logout().unwrap();
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      setUser(null);
-      navigate("/login");
     } catch (e) {
       console.error("Error during logout:", e);
-      // Даже если API выхода не сработал, очищаем локальное состояние
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      setUser(null);
+    } finally {
       navigate("/login");
     }
   };

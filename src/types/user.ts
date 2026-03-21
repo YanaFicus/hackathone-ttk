@@ -1,12 +1,12 @@
 export interface User {
-  id: number;
+  id: string;
   username: string;
   fullName: string;
-  roles: string[];
+  roles: number[];
   registrationDate: string;
 }
 
 export interface ChangePasswordData {
-  userId: number;
+  userId: string;
   password: string;
 }

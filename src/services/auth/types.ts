@@ -15,6 +15,10 @@ export interface RefreshRequest {
 }
 
 export interface AuthResponse {
+  userId: string;
+  login: string;
+  fullName: string;
+  roles: number[];
   token: string;
   refreshToken: string;
 }

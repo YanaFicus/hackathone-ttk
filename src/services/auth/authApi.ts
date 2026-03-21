@@ -1,6 +1,28 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { AuthResponse, LoginRequest, RefreshRequest, RegisterRequest } from "./types";
 
+const saveUserData = (data: AuthResponse) => {
+  localStorage.setItem("accessToken", data.token);
+  localStorage.setItem("refreshToken", data.refreshToken);
+  
+  // Сохраняем информацию о пользователе
+  const userInfo = {
+    userId: data.userId,
+    login: data.login,
+    fullName: data.fullName,
+    roles: data.roles,
+  };
+  localStorage.setItem("user", JSON.stringify(userInfo));
+  
+  console.log("User data saved:", userInfo);
+};
+
+const clearUserData = () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+};
+
 const baseQuery = fetchBaseQuery({
   baseUrl: "http://localhost:7000/api/auth",
   prepareHeaders: (headers) => {
@@ -30,6 +52,15 @@ export const authApi = createApi({
           ConfirmPassword: body.confirmPassword,
         },
       }),
+      async onQueryStarted(_, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // Сохраняем данные пользователя после успешной регистрации
+          saveUserData(data);
+        } catch (e) {
+          console.error("Register error", e);
+        }
+      },
     }),
 
     // LOGIN
@@ -45,10 +76,7 @@ export const authApi = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-
-          // сохраняем токены
-          localStorage.setItem("accessToken", data.token);
-          localStorage.setItem("refreshToken", data.refreshToken);
+          saveUserData(data);
         } catch (e) {
           console.error("Login error", e);
         }
@@ -79,14 +107,13 @@ export const authApi = createApi({
         url: "/logout",
         method: "POST",
       }),
-      async onQueryStarted(_, { queryFulfilled }) {
+       async onQueryStarted(_, { queryFulfilled }) {
         try {
           await queryFulfilled;
-
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
+          clearUserData();
         } catch (e) {
           console.error("Logout error", e);
+          clearUserData();
         }
       },
     }),
