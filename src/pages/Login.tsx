@@ -1,6 +1,6 @@
 import { LogIn } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLoginMutation } from "../services/auth/authApi";
 
 interface FormData {
@@ -15,6 +15,7 @@ export default function LoginPage() {
   });
 
   const [login] = useLoginMutation();
+  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -28,7 +29,7 @@ export default function LoginPage() {
       localStorage.setItem("accessToken", result.accessToken);
       localStorage.setItem("refreshToken", result.refreshToken);
       console.log("Logged in user:", result);
-      // navigate to main page
+      navigate('/');
     } catch (err) {
       console.error("Login error:", err);
       alert("Неверное имя пользователя или пароль");
