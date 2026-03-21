@@ -4,6 +4,7 @@ import About from "./pages/About";
 import Login from "./pages/Login";
 import StreamPlayer from "./pages/StreamPlayer";
 import BroadcasterPanel from "./pages/BroadcasterPanel";
+import Administration from "./pages/Administration";
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<StreamPlayer />} />
       <Route path="/broadcaster" element={<BroadcasterPanel />} />
+      <Route path="/administration" element={<Administration />} />
       <Route path="/home" element={<Home />} />
       <Route path="/about" element={<About />} />
       <Route path="*" element={<Navigate to="/" replace />} />
