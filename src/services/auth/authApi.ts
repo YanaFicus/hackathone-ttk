@@ -19,12 +19,16 @@ export const authApi = createApi({
   baseQuery,
   endpoints: (builder) => ({
     // REGISTER
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    register: builder.mutation<any, RegisterRequest>({
+    register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (body) => ({
         url: "/register",
         method: "POST",
-        body,
+        body: {
+          Login: body.username,
+          FullName: body.fullName,
+          Password: body.password,
+          ConfirmPassword: body.confirmPassword,
+        },
       }),
     }),
 
@@ -33,7 +37,10 @@ export const authApi = createApi({
       query: (body) => ({
         url: "/login",
         method: "POST",
-        body,
+        body: {
+          Login: body.username,
+          Password: body.password
+        },
       }),
       async onQueryStarted(_, { queryFulfilled }) {
         try {

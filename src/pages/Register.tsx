@@ -1,6 +1,7 @@
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useRegisterMutation } from "../services/auth/authApi";
 
 interface FormData {
   username: string;
@@ -18,6 +19,8 @@ export default function RegisterPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [register] = useRegisterMutation();
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -68,12 +71,19 @@ export default function RegisterPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    console.log("Регистрация:", formData);
-
-    // TODO: тут будет запрос на сервер
+    try {
+      const result = await register(formData).unwrap();
+      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("refreshToken", result.refreshToken);
+      console.log("Registered user:", result);
+      // navigate to main page
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      alert(err.data?.message || "Ошибка регистрации");
+    }
   };
 
   const handleLogin = () => {

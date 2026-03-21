@@ -1,6 +1,7 @@
 import { LogIn } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useLoginMutation } from "../services/auth/authApi";
 
 interface FormData {
   username: string;
@@ -13,23 +14,25 @@ export default function LoginPage() {
     password: "",
   });
 
+  const [login] = useLoginMutation();
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login attempt:", formData);
-    // авторизация
-  };
-
-  const handleRegister = () => {
-    console.log("Navigate to register");
-    // навигация на страницу регистрации
+    try {
+      const result = await login(formData).unwrap();
+      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("refreshToken", result.refreshToken);
+      console.log("Logged in user:", result);
+      // navigate to main page
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Неверное имя пользователя или пароль");
+    }
   };
 
   return (
@@ -104,13 +107,8 @@ export default function LoginPage() {
 
         <p className="text-center text-gray-600 mt-8 mb-8">
           Нет аккаунта?{" "}
-          <Link to='/register'>
-            <button
-              onClick={handleRegister}
-              className="text-primary font-medium hover:underline focus:outline-none"
-            >
-              Зарегистрируйтесь
-            </button>
+          <Link to='/register' className="text-primary font-medium hover:underline focus:outline-none">
+            Зарегистрируйтесь
           </Link>
         </p>
 
