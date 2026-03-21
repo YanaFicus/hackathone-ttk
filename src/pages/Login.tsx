@@ -1,4 +1,6 @@
+import { LogIn } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 interface FormData {
   username: string;
@@ -35,21 +37,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-10">
         <div className="flex justify-center mb-8">
           <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M5 12H19M19 12L12 5M19 12L12 19"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <LogIn className="text-white" />
           </div>
         </div>
 
@@ -116,12 +104,14 @@ export default function LoginPage() {
 
         <p className="text-center text-gray-600 mt-8 mb-8">
           Нет аккаунта?{" "}
-          <button
-            onClick={handleRegister}
-            className="text-primary font-medium hover:underline focus:outline-none"
-          >
-            Зарегистрируйтесь
-          </button>
+          <Link to='/register'>
+            <button
+              onClick={handleRegister}
+              className="text-primary font-medium hover:underline focus:outline-none"
+            >
+              Зарегистрируйтесь
+            </button>
+          </Link>
         </p>
 
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
