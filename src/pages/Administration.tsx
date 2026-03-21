@@ -1,6 +1,19 @@
 import { useState } from "react";
 import type { DateTimeFormatOptions } from "intl";
 import Header from "../components/Header";
+import EditUserModal from "../components/modals/EditUserModal";
+import ChangePasswordModal from "../components/modals/ChangePasswordModal";
+import AssignRolesModal from "../components/modals/AssignRolesModal";
+import DeleteUserModal from "../components/modals/DeleteUserModal";
+import type { User, ChangePasswordData } from "../types/user";
+
+type ModalType = "edit" | "password" | "roles" | "delete";
+
+const roleLabels: Record<string, string> = {
+  administrator: "Администратор",
+  broadcaster: "Вещатель",
+  user: "Пользователь",
+};
 
 export default function Administration() {
   // Состояния фильтров
@@ -14,41 +27,50 @@ export default function Administration() {
 
   const [showClearAll, setShowClearAll] = useState(false);
 
+  const [modals, setModals] = useState({
+    edit: false,
+    password: false,
+    roles: false,
+    delete: false,
+  });
+
+  const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
+
   // Демо-данные пользователей
-  const [users] = useState([
+  const [users, setUsers] = useState<User[]>([
     {
       id: 1,
       username: "admin",
       fullName: "Администратор Системы",
-      roles: ["Администратор", "Вещатель", "Пользователь"],
+      roles: ["administrator", "broadcaster", "user"],
       registrationDate: "2024-01-15",
     },
     {
       id: 2,
       username: "broadcaster",
       fullName: "Иван Петров",
-      roles: ["Вещатель", "Пользователь"],
+      roles: ["broadcaster", "user"],
       registrationDate: "2024-02-20",
     },
     {
       id: 3,
       username: "user",
       fullName: "Мария Иванова",
-      roles: ["Пользователь"],
+      roles: ["user"],
       registrationDate: "2024-03-10",
     },
     {
       id: 4,
       username: "alexsmith",
       fullName: "Алексей Смирнов",
-      roles: ["Пользователь"],
+      roles: ["user"],
       registrationDate: "2024-03-15",
     },
     {
       id: 5,
       username: "broadcaster2",
       fullName: "Елена Васильева",
-      roles: ["Вещатель", "Пользователь"],
+      roles: ["broadcaster", "user"],
       registrationDate: "2024-03-18",
     },
   ]);
@@ -62,10 +84,7 @@ export default function Administration() {
       filters.fullName === "" ||
       user.fullName.toLowerCase().includes(filters.fullName.toLowerCase());
     const matchesRole =
-      filters.role === "all" ||
-      user.roles
-        .map((r) => r.toLowerCase())
-        .includes(filters.role.toLowerCase());
+      filters.role === "all" || user.roles.includes(filters.role);
 
     return matchesUsername && matchesFullName && matchesRole;
   });
@@ -96,32 +115,46 @@ export default function Administration() {
     setShowClearAll(false);
   };
 
-  const handleEditUser = (userId: number) => {
-    console.log("Edit user:", userId);
+  const openModal = (type: ModalType, user: User) => {
+    setSelectedUser(user);
+    setModals((prev) => ({ ...prev, [type]: true }));
   };
 
-  const handleGrantAccess = (userId: number) => {
-    console.log("Grant access to user:", userId);
+  const closeModal = (type: ModalType) => {
+    setModals((prev) => ({ ...prev, [type]: false }));
+    setSelectedUser(undefined);
   };
 
-  const handleProtectUser = (userId: number) => {
-    console.log("Protect user:", userId);
+  const handleEditUser = (updatedUser: User) => {
+    setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    console.log("User updated:", updatedUser);
+  };
+
+  const handleChangePassword = ({ userId, password }: ChangePasswordData) => {
+    console.log("Password changed for user:", userId, password);
+    alert("Пароль успешно изменён!");
+  };
+
+  const handleAssignRoles = (updatedUser: User) => {
+    setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    console.log("Roles assigned:", updatedUser);
   };
 
   const handleDeleteUser = (userId: number) => {
-    if (window.confirm("Вы уверены, что хотите удалить этого пользователя?")) {
-      console.log("Delete user:", userId);
-    }
+    setUsers(users.filter((u) => u.id !== userId));
+    console.log("User deleted:", userId);
   };
 
   // Получение цвета для роли
   const getRoleColor = (role: string) => {
-    switch (role.toLowerCase()) {
-      case "администратор":
+    const normalizedRole = role.toLowerCase();
+
+    switch (normalizedRole) {
+      case "administrator":
         return "bg-red-100 text-red-700 border-red-200";
-      case "вещатель":
+      case "broadcaster":
         return "bg-purple-100 text-purple-700 border-purple-200";
-      case "пользователь":
+      case "user":
         return "bg-blue-100 text-blue-700 border-blue-200";
       default:
         return "bg-gray-100 text-gray-700 border-gray-200";
@@ -259,9 +292,9 @@ export default function Administration() {
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all bg-white"
                 >
                   <option value="all">Все роли</option>
-                  <option value="пользователь">Пользователь</option>
-                  <option value="вещатель">Вещатель</option>
-                  <option value="администратор">Администратор</option>
+                  <option value="user">Пользователь</option>
+                  <option value="broadcaster">Вещатель</option>
+                  <option value="administrator">Администратор</option>
                 </select>
               </div>
 
@@ -341,14 +374,17 @@ export default function Administration() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1.5">
-                        {user.roles.map((role) => (
-                          <span
-                            key={role}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-md border ${getRoleColor(role)}`}
-                          >
-                            {role}
-                          </span>
-                        ))}
+                        {user.roles.map((role) => {
+                          const normalizedRole = role.toLowerCase();
+                          return (
+                            <span
+                              key={role}
+                              className={`px-2.5 py-1 text-xs font-medium rounded-md border ${getRoleColor(role)}`}
+                            >
+                              {roleLabels[normalizedRole] || role}
+                            </span>
+                          );
+                        })}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -360,7 +396,7 @@ export default function Administration() {
                       <div className="flex items-center justify-end gap-2">
                         {/* Edit */}
                         <button
-                          onClick={() => handleEditUser(user.id)}
+                          onClick={() => openModal("edit", user)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit"
                         >
@@ -379,7 +415,7 @@ export default function Administration() {
 
                         {/* Grant Access */}
                         <button
-                          onClick={() => handleGrantAccess(user.id)}
+                          onClick={() => openModal("password", user)}
                           className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                           title="Grant Access"
                         >
@@ -400,7 +436,7 @@ export default function Administration() {
 
                         {/* Protect */}
                         <button
-                          onClick={() => handleProtectUser(user.id)}
+                          onClick={() => openModal("roles", user)}
                           className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                           title="Protect"
                         >
@@ -418,7 +454,7 @@ export default function Administration() {
 
                         {/* Delete */}
                         <button
-                          onClick={() => handleDeleteUser(user.id)}
+                          onClick={() => openModal("delete", user)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >
@@ -452,6 +488,43 @@ export default function Administration() {
           </div>
         </div>
       </main>
+
+      {selectedUser && (
+        <EditUserModal
+          key={selectedUser.id}
+          isOpen={modals.edit}
+          onClose={() => closeModal("edit")}
+          user={selectedUser}
+          onSave={handleEditUser}
+        />
+      )}
+
+      {selectedUser && (
+        <ChangePasswordModal
+          isOpen={modals.password}
+          onClose={() => closeModal("password")}
+          user={selectedUser}
+          onSave={handleChangePassword}
+        />
+      )}
+
+      {selectedUser && (
+        <AssignRolesModal
+          isOpen={modals.roles}
+          onClose={() => closeModal("roles")}
+          user={selectedUser}
+          onSave={handleAssignRoles}
+        />
+      )}
+
+      {selectedUser && (
+        <DeleteUserModal
+          isOpen={modals.delete}
+          onClose={() => closeModal("delete")}
+          user={selectedUser}
+          onDelete={handleDeleteUser}
+        />
+      )}
     </div>
   );
 }
