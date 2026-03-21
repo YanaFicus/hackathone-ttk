@@ -43,6 +43,7 @@ bun dev
 Открой браузер и перейди на: http://localhost:5173
 
 ## 📦 Структура проекта
+```
 hackathone-ttk/
 ├─ src/
 │  ├─ index.jsx         # Точка входа
@@ -54,6 +55,7 @@ hackathone-ttk/
 ├─ bun.lockb            # lock-файл Bun
 ├─ tailwind.config.js   # Настройка Tailwind
 └─ package.json
+```
 
 ## 🎨 Tailwind CSS v4
 
@@ -70,8 +72,8 @@ hackathone-ttk/
 
 Примеры маршрутов:
 
-/       -> Home
-/about  -> About
+- /       -> Home
+- /about  -> About
 
 ## ✅ Советы
 
