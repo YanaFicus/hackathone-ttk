@@ -1,11 +1,11 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
 export default function Header() {
   const navigate = useNavigate();
-  
+
   const handleLogout = () => {
     // Здесь будет логика выхода
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
@@ -17,32 +17,40 @@ export default function Header() {
             {/* Логотип */}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <svg 
-                  width="20" 
-                  height="20" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path 
-                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z" 
+                  <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
                     fill="white"
                   />
-                  <path 
-                    d="M12 6c-3.31 0-6 2.69-6 6 0 1.66.67 3.16 1.76 4.24l1.42-1.42C8.45 14.09 8 13.09 8 12c0-2.21 1.79-4 4-4 .55 0 1 .45 1 1s-.45 1-1 1z" 
+                  <path
+                    d="M12 6c-3.31 0-6 2.69-6 6 0 1.66.67 3.16 1.76 4.24l1.42-1.42C8.45 14.09 8 13.09 8 12c0-2.21 1.79-4 4-4 .55 0 1 .45 1 1s-.45 1-1 1z"
                     fill="white"
                   />
                 </svg>
               </div>
-              <span className="text-xl font-bold text-gray-900">Менеджер Стримов</span>
+              <span className="text-xl font-bold text-gray-900">
+                Менеджер Стримов
+              </span>
             </div>
 
             {/* Навигация */}
             <nav className="hidden md:flex items-center gap-1">
-              <button className="px-4 py-2 text-sm font-medium text-primary bg-blue-50 rounded-lg">
+              <button
+                onClick={() => navigate("/")}
+                className="px-4 py-2 text-sm font-medium text-primary bg-blue-50 rounded-lg"
+              >
                 Главная
               </button>
-              <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+              <button
+                onClick={() => navigate("/broadcaster")}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              >
                 Вещатель
               </button>
               <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
@@ -55,15 +63,15 @@ export default function Header() {
           <div className="flex items-center gap-4">
             {/* Роли пользователя */}
             <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
                 className="text-gray-500"
               >
-                <path 
-                  d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" 
+                <path
+                  d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
                   fill="currentColor"
                 />
               </svg>
@@ -82,16 +90,16 @@ export default function Header() {
             </div>
 
             {/* Кнопка выхода */}
-            <button 
+            <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <svg 
-                width="18" 
-                height="18" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
                 strokeWidth="2"
               >
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
