@@ -302,7 +302,7 @@ export default function BroadcasterPanel() {
                     <polyline points="7 23 3 19 7 15" />
                     <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                   </svg>
-                  Loop
+                  Зациклить
                 </button>
                 <button
                   onClick={() => setIsShuffle(!isShuffle)}
@@ -326,7 +326,7 @@ export default function BroadcasterPanel() {
                     <line x1="15" y1="15" x2="21" y2="21" />
                     <line x1="4" y1="4" x2="9" y2="9" />
                   </svg>
-                  Shuffle
+                  Перемешать
                 </button>
               </div>
 
@@ -685,7 +685,7 @@ export default function BroadcasterPanel() {
                   <div className="text-2xl font-bold text-blue-600">
                     {newMessagesCount}
                   </div>
-                  <div className="text-xs text-blue-700 mt-1">New</div>
+                  <div className="text-xs text-blue-700 mt-1">Новые</div>
                 </div>
                 <div className="text-center p-3 bg-yellow-50 rounded-xl">
                   <div className="text-2xl font-bold text-yellow-600">
@@ -697,7 +697,7 @@ export default function BroadcasterPanel() {
                   <div className="text-2xl font-bold text-green-600">
                     {completedCount}
                   </div>
-                  <div className="text-xs text-green-700 mt-1">Completed</div>
+                  <div className="text-xs text-green-700 mt-1">Завершены</div>
                 </div>
               </div>
             </div>
