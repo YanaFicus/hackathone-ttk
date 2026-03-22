@@ -33,24 +33,24 @@ export default function StreamPlayer() {
   }, []);
 
   useEffect(() => {
-  const handleUserGesture = () => {
-    // Разрешаем AudioContext после первого клика
-    if (audioRef.current) {
-      audioRef.current.play().catch(() => {});
-    }
-    // Убираем обработчик после первого срабатывания
-    document.removeEventListener('click', handleUserGesture);
-    document.removeEventListener('touchstart', handleUserGesture);
-  };
-  
-  document.addEventListener('click', handleUserGesture);
-  document.addEventListener('touchstart', handleUserGesture);
-  
-  return () => {
-    document.removeEventListener('click', handleUserGesture);
-    document.removeEventListener('touchstart', handleUserGesture);
-  };
-}, []);
+    const handleUserGesture = () => {
+      // Разрешаем AudioContext после первого клика
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      }
+      // Убираем обработчик после первого срабатывания
+      document.removeEventListener("click", handleUserGesture);
+      document.removeEventListener("touchstart", handleUserGesture);
+    };
+
+    document.addEventListener("click", handleUserGesture);
+    document.addEventListener("touchstart", handleUserGesture);
+
+    return () => {
+      document.removeEventListener("click", handleUserGesture);
+      document.removeEventListener("touchstart", handleUserGesture);
+    };
+  }, []);
 
   const connectToStream = async () => {
     if (isConnected || isConnecting) return;
@@ -136,11 +136,13 @@ export default function StreamPlayer() {
             `Track unsubscribed: ${track.kind} from ${participant.identity}`,
           );
 
-          if (track.kind === "video") {
+          if (track.kind === "audio" && audioRef.current) {
+            audioRef.current.srcObject = null;
+          }
+
+          if (track.kind === "video" && videoRef.current) {
+            videoRef.current.srcObject = null;
             setHasVideo(false);
-            if (videoRef.current) {
-              videoRef.current.srcObject = null;
-            }
           }
         },
       );

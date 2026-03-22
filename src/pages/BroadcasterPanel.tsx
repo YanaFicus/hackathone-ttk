@@ -149,12 +149,10 @@ export default function BroadcasterPanel() {
               isRecording={broadcaster.isRecording}
               isMuted={isMuted}
               masterVolume={broadcaster.masterVolume}
-              onToggleRecording={() =>
-                broadcaster.setIsRecording(!broadcaster.isRecording)
-              }
+              onToggleRecording={broadcaster.handleToggleRecording}
               onToggleMute={broadcaster.handleToggleMute}
               onVolumeChange={broadcaster.setMasterVolume}
-              isBroadcasting={false}
+              isBroadcasting={isBroadcasting}
             />
             <VideoBroadcast
               isVideoEnabled={isVideoEnabled}
