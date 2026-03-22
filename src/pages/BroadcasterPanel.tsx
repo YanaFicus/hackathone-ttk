@@ -62,20 +62,22 @@ export default function BroadcasterPanel() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* HEADER */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-purple-600">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" fill="currentColor" />
-              <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.5" />
-            </svg>
-            <h1 className="text-3xl font-bold text-gray-900">Панель управления вещателя</h1>
-          </div>
-          <p className="text-gray-600">Управляйте своими трансляциями, плейлистами и сообщениями аудитории</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Панель управления вещателя
+          </h1>
+          <p className="text-gray-600">
+            Управляйте трансляцией и контентом
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* ЛЕВАЯ ЧАСТЬ */}
           <div className="lg:col-span-2 space-y-6">
+
             <BroadcastStatus
               isBroadcasting={isBroadcasting}
               isLoading={broadcaster.botInfoLoading}
@@ -121,11 +123,12 @@ export default function BroadcasterPanel() {
               masterVolume={broadcaster.masterVolume}
               onToggleRecording={() => broadcaster.setIsRecording(!broadcaster.isRecording)}
               onToggleMute={broadcaster.handleToggleMute}
-              onVolumeChange={broadcaster.setMasterVolume}
-            />
+              onVolumeChange={broadcaster.setMasterVolume} isBroadcasting={false}            />
 
             <VideoBroadcast
               isVideoEnabled={isVideoEnabled}
+              isBroadcasting={isBroadcasting}
+              localStream={broadcaster.localStream}
               onToggleVideo={broadcaster.handleToggleVideo}
             />
           </div>
@@ -135,9 +138,12 @@ export default function BroadcasterPanel() {
               messages={messages}
               archivedMessages={ARCHIVED_MESSAGES}
               showArchive={broadcaster.showArchive}
-              onToggleArchive={() => broadcaster.setShowArchive(!broadcaster.showArchive)}
+              onToggleArchive={() =>
+                broadcaster.setShowArchive(!broadcaster.showArchive)
+              }
               onStatusChange={handleMessageStatus}
             />
+
             <MessageStatistics
               newCount={newCount}
               inProgressCount={inProgressCount}

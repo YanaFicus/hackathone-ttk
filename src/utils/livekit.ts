@@ -1,3 +1,4 @@
+
 // Утилита для загрузки на S3 с прогрессом
 export const uploadToS3 = async (
   file: File,

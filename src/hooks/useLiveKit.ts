@@ -1,130 +1,228 @@
-// import { useState, useEffect, useCallback } from "react";
-// import { Room, RemoteParticipant, Track } from "livekit-client";
-// import { useCreateLiveKitTokenMutation } from "../services/livekit/livekitApi";
+// import { useState, useEffect, useCallback, useRef } from 'react';
+// import {
+//   Room,
+//   RoomEvent,
+//   Track,
+//   TrackPublication,
+//   RemoteParticipant,
+//   LocalVideoTrack,
+//   LocalAudioTrack,
+//   createLocalVideoTrack,
+//   createLocalAudioTrack,
+//   VideoPresets,
+// } from 'livekit-client';
+// import { useCreateLiveKitTokenMutation } from '../services/livekit/livekitApi';
+// import type { LiveKitTokenRequest } from '../services/livekit/types';
 
-// interface UseLiveKitOptions {
-//   roomName: string;
-//   participantName: string;
-//   onConnected?: () => void;
-//   onDisconnected?: () => void;
-//   onParticipantJoined?: (participant: RemoteParticipant) => void;
-//   onParticipantLeft?: (participant: RemoteParticipant) => void;
-//   onTrackSubscribed?: (track: Track, participant: RemoteParticipant) => void;
+// const LIVEKIT_WS_URL = 'ws://95.174.104.223:7880';
+// const DEFAULT_ROOM = 'main-broadcast';
+
+// export interface UseLiveKitOptions {
+//   autoConnect?: boolean;
+//   publishVideo?: boolean;
+//   publishAudio?: boolean;
+//   roomName?: string;
 // }
 
-// export const useLiveKit = (options: UseLiveKitOptions) => {
+// export interface UseLiveKitReturn {
+//   room: Room | null;
+//   isConnected: boolean;
+//   isPublishing: boolean;
+//   localTracks: Track[];
+//   remoteParticipants: Map<string, RemoteParticipant>;
+//   connect: (token: string, roomName?: string) => Promise<void>;
+//   disconnect: () => Promise<void>;
+//   publishTracks: (options?: { video?: boolean; audio?: boolean }) => Promise<void>;
+//   unpublishTracks: () => void;
+//   getLocalVideoTrack: () => LocalVideoTrack | undefined;
+//   getLocalAudioTrack: () => LocalAudioTrack | undefined;
+//   error: Error | null;
+// }
+
+// export const useLiveKit = (
+//   options: UseLiveKitOptions = {}
+// ): UseLiveKitReturn => {
+//   const {
+//     autoConnect = false,
+//     publishVideo = true,
+//     publishAudio = true,
+//     roomName = DEFAULT_ROOM,
+//   } = options;
+
+//   const [createToken] = useCreateLiveKitTokenMutation();
 //   const [room, setRoom] = useState<Room | null>(null);
 //   const [isConnected, setIsConnected] = useState(false);
-//   const [isConnecting, setIsConnecting] = useState(false);
-//   const [error, setError] = useState<string | null>(null);
-//   const [createToken] = useCreateLiveKitTokenMutation();
+//   const [isPublishing, setIsPublishing] = useState(false);
+//   const [localTracks, setLocalTracks] = useState<Track[]>([]);
+//   const [remoteParticipants, setRemoteParticipants] = useState<
+//     Map<string, RemoteParticipant>
+//   >(new Map());
+//   const [error, setError] = useState<Error | null>(null);
+//   const tracksRef = useRef<Track[]>([]);
 
-//   const connect = useCallback(async () => {
-//     if (isConnected || isConnecting) return;
+//   const connect = useCallback(
+//     async (token: string, targetRoom?: string) => {
+//       try {
+//         const newRoom = new Room();
 
-//     setIsConnecting(true);
-//     setError(null);
+//         newRoom.on(RoomEvent.Connected, () => {
+//           setIsConnected(true);
+//           setError(null);
+//         });
 
-//     try {
-//       // Получаем токен от сервера
-//       const { token, url } = await createToken({
-//         roomName: options.roomName,
-//         participantName: options.participantName,
-//       }).unwrap();
+//         newRoom.on(RoomEvent.Disconnected, () => {
+//           setIsConnected(false);
+//           setIsPublishing(false);
+//           setLocalTracks([]);
+//         });
 
-//       // Создаем комнату и подключаемся
-//       const newRoom = new Room({
-//         adaptiveStream: true,
-//         dynacast: true,
-//       });
+//         newRoom.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+//           setRemoteParticipants((prev) => {
+//             const next = new Map(prev);
+//             next.set(participant.sid, participant);
+//             return next;
+//           });
+//         });
 
-//       // Настраиваем обработчики событий
-//       newRoom.on("connected", () => {
-//         setIsConnected(true);
-//         options.onConnected?.();
-//       });
+//         newRoom.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+//           setRemoteParticipants((prev) => {
+//             const next = new Map(prev);
+//             next.delete(participant.sid);
+//             return next;
+//           });
+//         });
 
-//       newRoom.on("disconnected", () => {
-//         setIsConnected(false);
-//         options.onDisconnected?.();
-//       });
+//         newRoom.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+//           if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
+//             const element = track.attach();
+//             element.autoplay = true;
+//             element.playsInline = true;
+//           }
+//         });
 
-//       newRoom.on("participantConnected", (participant) => {
-//         options.onParticipantJoined?.(participant);
-//       });
+//         newRoom.on(RoomEvent.TrackUnsubscribed, (track) => {
+//           track.detach();
+//         });
 
-//       newRoom.on("participantDisconnected", (participant) => {
-//         options.onParticipantLeft?.(participant);
-//       });
+//         newRoom.on(RoomEvent.MediaDevicesError, (err: Error) => {
+//           setError(err);
+//         });
 
-//       newRoom.on("trackSubscribed", (track, publication, participant) => {
-//         options.onTrackSubscribed?.(track, participant);
-//       });
+//         await newRoom.connect(`${LIVEKIT_WS_URL}/rtc`, token, {
+//           autoSubscribe: true,
+//           publishDefaults: {
+//             videoCodec: 'vp8',
+//             videoEncoding: { maxBitrate: 2_000_000 },
+//             audioBitrate: 128,
+//             dtx: true,
+//             red: true,
+//             forceStereo: false,
+//           },
+//           adaptiveStream: {
+//             pixelDensity: 'screen',
+//             maxDimensions: {
+//               video: { width: 1280, height: 720 },
+//             },
+//           },
+//         });
 
-//       await newRoom.connect(url, token);
-//       setRoom(newRoom);
-//     } catch (err) {
-//       console.error("Failed to connect to LiveKit:", err);
-//       setError(err instanceof Error ? err.message : "Failed to connect");
-//     } finally {
-//       setIsConnecting(false);
-//     }
-//   }, [createToken, options, isConnected, isConnecting]);
+//         setRoom(newRoom);
+//       } catch (err) {
+//         setError(err instanceof Error ? err : new Error('Connection failed'));
+//         throw err;
+//       }
+//     },
+//     []
+//   );
 
 //   const disconnect = useCallback(async () => {
 //     if (room) {
+//       unpublishTracks();
 //       await room.disconnect();
 //       setRoom(null);
 //       setIsConnected(false);
 //     }
 //   }, [room]);
 
-//   const publishAudio = useCallback(async (track: MediaStreamTrack) => {
-//     if (room && room.localParticipant) {
-//       await room.localParticipant.publishTrack(track, {
-//         source: Track.Source.Microphone,
-//       });
-//     }
+//   const publishTracks = useCallback(
+//     async (opts?: { video?: boolean; audio?: boolean }) => {
+//       if (!room || !room.localParticipant) return;
+
+//       const { video = publishVideo, audio = publishAudio } = opts || {};
+//       const tracks: Track[] = [];
+
+//       try {
+//         if (video) {
+//           const videoTrack = await createLocalVideoTrack({
+//             resolution: VideoPresets.h720,
+//             facingMode: 'user',
+//           });
+//           await room.localParticipant.publishTrack(videoTrack);
+//           tracks.push(videoTrack);
+//         }
+
+//         if (audio) {
+//           const audioTrack = await createLocalAudioTrack({
+//             echoCancellation: true,
+//             noiseSuppression: true,
+//             autoGainControl: true,
+//           });
+//           await room.localParticipant.publishTrack(audioTrack);
+//           tracks.push(audioTrack);
+//         }
+
+//         setLocalTracks(tracks);
+//         tracksRef.current = tracks;
+//         setIsPublishing(tracks.length > 0);
+//       } catch (err) {
+//         setError(err instanceof Error ? err : new Error('Publish failed'));
+//         throw err;
+//       }
+//     },
+//     [room, publishVideo, publishAudio]
+//   );
+
+//   const unpublishTracks = useCallback(() => {
+//     if (!room || !room.localParticipant) return;
+
+//     tracksRef.current.forEach((track) => {
+//       room.localParticipant?.unpublishTrack(track);
+//       track.detach();
+//     });
+
+//     setLocalTracks([]);
+//     tracksRef.current = [];
+//     setIsPublishing(false);
 //   }, [room]);
 
-//   const publishVideo = useCallback(async (track: MediaStreamTrack) => {
-//     if (room && room.localParticipant) {
-//       await room.localParticipant.publishTrack(track, {
-//         source: Track.Source.Camera,
-//       });
-//     }
-//   }, [room]);
+//   const getLocalVideoTrack = useCallback(
+//     () => localTracks.find((t) => t.kind === Track.Kind.Video) as LocalVideoTrack | undefined,
+//     [localTracks]
+//   );
 
-//   const unpublishAudio = useCallback(() => {
-//     if (room && room.localParticipant) {
-//       room.localParticipant.unpublishTracks(Track.Source.Microphone);
-//     }
-//   }, [room]);
-
-//   const unpublishVideo = useCallback(() => {
-//     if (room && room.localParticipant) {
-//       room.localParticipant.unpublishTracks(Track.Source.Camera);
-//     }
-//   }, [room]);
+//   const getLocalAudioTrack = useCallback(
+//     () => localTracks.find((t) => t.kind === Track.Kind.Audio) as LocalAudioTrack | undefined,
+//     [localTracks]
+//   );
 
 //   useEffect(() => {
 //     return () => {
-//       if (room) {
-//         room.disconnect();
-//       }
+//       disconnect();
 //     };
-//   }, [room]);
+//   }, [disconnect]);
 
 //   return {
 //     room,
 //     isConnected,
-//     isConnecting,
-//     error,
+//     isPublishing,
+//     localTracks,
+//     remoteParticipants,
 //     connect,
 //     disconnect,
-//     publishAudio,
-//     publishVideo,
-//     unpublishAudio,
-//     unpublishVideo,
+//     publishTracks,
+//     unpublishTracks,
+//     getLocalVideoTrack,
+//     getLocalAudioTrack,
+//     error,
 //   };
 // };

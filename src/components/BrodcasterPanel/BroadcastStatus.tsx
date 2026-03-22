@@ -9,7 +9,7 @@ interface BroadcastStatusProps {
   onToggleBroadcast: () => void;
   onPlay: () => void;
   onPause: () => void;
-  onStop: () => void;
+  onStop: () => void;  // Добавлен onStop
   onNext: () => void;
   onPrevious: () => void;
   onToggleMute: () => void;
@@ -28,6 +28,7 @@ export const BroadcastStatus: React.FC<BroadcastStatusProps> = ({
   onToggleBroadcast,
   onPlay,
   onPause,
+  onStop,
   onNext,
   onPrevious,
   onToggleMute,
@@ -36,6 +37,15 @@ export const BroadcastStatus: React.FC<BroadcastStatusProps> = ({
   formatDuration,
   botState,
 }) => {
+  const displayName = currentTrack?.key?.split('/').pop() || 'Неизвестный трек';
+
+  const handleToggleWithStop = () => {
+    onToggleBroadcast();
+    if (isBroadcasting) {
+      onStop();
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -48,7 +58,7 @@ export const BroadcastStatus: React.FC<BroadcastStatusProps> = ({
       </div>
 
       <button
-        onClick={onToggleBroadcast}
+        onClick={handleToggleWithStop}
         disabled={isLoading}
         className={`w-full py-4 px-6 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
           isBroadcasting ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
@@ -64,12 +74,13 @@ export const BroadcastStatus: React.FC<BroadcastStatusProps> = ({
       {currentTrack && (
         <div className="mt-4 pt-4 border-t border-gray-100">
           <p className="text-sm text-gray-600 mb-2 truncate">
-            🎵 Сейчас: {currentTrack.key?.split('/').pop()}
+            🎵 Сейчас: {displayName}
           </p>
           <div className="flex items-center gap-2">
             <button onClick={onPrevious} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Предыдущий">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" />
+                <polygon points="19 20 9 12 19 4 19 20" />
+                <line x1="5" y1="19" x2="5" y2="5" />
               </svg>
             </button>
             <button
@@ -79,7 +90,8 @@ export const BroadcastStatus: React.FC<BroadcastStatusProps> = ({
             >
               {botState === 'playing' ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
                 </svg>
               ) : (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -89,7 +101,8 @@ export const BroadcastStatus: React.FC<BroadcastStatusProps> = ({
             </button>
             <button onClick={onNext} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Следующий">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" />
+                <polygon points="5 4 15 12 5 20 5 4" />
+                <line x1="19" y1="5" x2="19" y2="19" />
               </svg>
             </button>
             <button
@@ -100,18 +113,21 @@ export const BroadcastStatus: React.FC<BroadcastStatusProps> = ({
               {isMuted ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
                 </svg>
               ) : (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
                 </svg>
               )}
             </button>
             <button onClick={onClearQueue} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg ml-auto" title="Очистить очередь">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
             </button>
           </div>

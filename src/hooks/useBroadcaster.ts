@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   useGetBotInfoQuery,
@@ -19,7 +20,7 @@ import {
   useCreateLiveKitTokenMutation,
 } from '../services/livekit/livekitApi';
 import type { TrackItem, RepeatMode, MediaFile as ApiMediaFile } from '../services/livekit/types';
-import { uploadToS3, connectToLiveKit } from '../utils/livekit';
+import { uploadToS3 } from '../utils/livekit';
 import { getUserId } from '../utils/auth';
 
 const LIVEKIT_WS_URL = 'ws://95.174.104.223:7880';
@@ -31,7 +32,10 @@ export const useBroadcaster = () => {
   const [isShuffle, setIsShuffle] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [liveKitWs, setLiveKitWs] = useState<WebSocket | null>(null);
+  const [liveKitRoom, setLiveKitRoom] = useState<any>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [publishedTracks, setPublishedTracks] = useState<any[]>([]);
   const userId = useMemo(() => getUserId() || '', []);
 
   const {
@@ -111,6 +115,51 @@ export const useBroadcaster = () => {
     });
   }, [botInfo?.queue]);
 
+  const publishTracks = useCallback(async () => {
+    if (!liveKitRoom || !isConnected || !localStream) return;
+    
+    try {
+      const videoTrack = localStream.getVideoTracks()[0];
+      const audioTrack = localStream.getAudioTracks()[0];
+      const published: any[] = [];
+      
+      if (videoTrack) {
+        const publication = await liveKitRoom.localParticipant.publishTrack(videoTrack, {
+          source: 1,
+          name: 'camera',
+        });
+        published.push(publication);
+      }
+      
+      if (audioTrack) {
+        const publication = await liveKitRoom.localParticipant.publishTrack(audioTrack, {
+          source: 2,
+          name: 'microphone',
+        });
+        published.push(publication);
+      }
+      
+      setPublishedTracks(published);
+    } catch (err) {
+      console.error('Failed to publish tracks:', err);
+    }
+  }, [liveKitRoom, isConnected, localStream]);
+
+  const unpublishTracks = useCallback(async () => {
+    if (!liveKitRoom || !isConnected) return;
+    
+    try {
+      for (const publication of publishedTracks) {
+        if (publication.track) {
+          await liveKitRoom.localParticipant.unpublishTrack(publication.track);
+        }
+      }
+      setPublishedTracks([]);
+    } catch (err) {
+      console.error('Failed to unpublish tracks:', err);
+    }
+  }, [liveKitRoom, isConnected, publishedTracks]);
+
   const handleAddToPlaylist = useCallback(async (src: string) => {
     try {
       await addToQueue([src]).unwrap();
@@ -142,6 +191,16 @@ export const useBroadcaster = () => {
   const handleToggleBroadcast = useCallback(async () => {
     if (isBroadcasting) {
       await playerStop().unwrap();
+      if (liveKitRoom) {
+        await unpublishTracks();
+        liveKitRoom.disconnect();
+        setLiveKitRoom(null);
+        setIsConnected(false);
+        if (localStream) {
+          localStream.getTracks().forEach(track => track.stop());
+          setLocalStream(null);
+        }
+      }
     } else {
       try {
         const tokenData = await createLiveKitToken({
@@ -150,18 +209,50 @@ export const useBroadcaster = () => {
           role: 'Leading',
         }).unwrap();
         
-        const ws = await connectToLiveKit(tokenData.token, 'main-broadcast', LIVEKIT_WS_URL);
-        ws.onopen = () => {
+        console.log('LiveKit token received:', tokenData.token);
+        
+        const { Room, RoomEvent } = await import('livekit-client');
+        
+        const room = new Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+        
+        room.on(RoomEvent.Connected, () => {
+          console.log('Connected to LiveKit room:', room.name);
+          setIsConnected(true);
+          setLiveKitRoom(room);
           playerPlay().unwrap();
-          setLiveKitWs(ws);
-        };
-        ws.onerror = (err) => console.error('LiveKit error:', err);
+        });
+        
+        room.on(RoomEvent.Disconnected, () => {
+          console.log('Disconnected from LiveKit');
+          setIsConnected(false);
+          setLiveKitRoom(null);
+        });
+        
+        room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+          console.log(`Track subscribed: ${track.kind} from ${participant.identity}`);
+          if (track.kind === 'video') {
+            const element = track.attach();
+            const videoContainer = document.getElementById('remote-video');
+            if (videoContainer) {
+              videoContainer.appendChild(element);
+            }
+          }
+          if (track.kind === 'audio') {
+            track.attach();
+          }
+        });
+        
+        await room.connect(LIVEKIT_WS_URL, tokenData.token);
+        
       } catch (err) {
         console.error('Failed to start broadcast:', err);
         alert('Не удалось начать вещание');
       }
     }
-  }, [isBroadcasting, createLiveKitToken, playerPlay, playerStop]);
+  }, [isBroadcasting, createLiveKitToken, playerPlay, playerStop, liveKitRoom, unpublishTracks, localStream]);
 
   const handleFileUpload = useCallback(async (file: File): Promise<void> => {
     if (!userId) {
@@ -259,23 +350,39 @@ export const useBroadcaster = () => {
   const handleToggleVideo = useCallback(async () => {
     if (!isVideoEnabled) {
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setLocalStream(stream);
         setIsVideoEnabled(true);
-      } catch {
+        
+        if (liveKitRoom && isConnected) {
+          await publishTracks();
+        }
+      } catch (err) {
+        console.error('Failed to access camera:', err);
         alert('Не удалось получить доступ к камере');
       }
     } else {
       setIsVideoEnabled(false);
+      if (liveKitRoom && isConnected) {
+        await unpublishTracks();
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        setLocalStream(null);
+      }
     }
-  }, [isVideoEnabled]);
+  }, [isVideoEnabled, liveKitRoom, isConnected, publishTracks, unpublishTracks, localStream]);
 
   useEffect(() => {
     return () => {
-      if (liveKitWs) {
-        liveKitWs.close();
+      if (liveKitRoom) {
+        liveKitRoom.disconnect();
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [liveKitWs]);
+  }, [liveKitRoom, localStream]);
 
   return {
     isBroadcasting,
@@ -299,6 +406,10 @@ export const useBroadcaster = () => {
     repeatMode,
     mediaFiles,
     playlist,
+    isConnected,
+    room: liveKitRoom,
+    localStream,
+    publishedTracks,
     handleToggleBroadcast,
     handleFileUpload,
     handleDeleteFile,
@@ -314,6 +425,8 @@ export const useBroadcaster = () => {
     handleToggleMute,
     handleSeek,
     handleToggleVideo,
+    publishTracks,
+    unpublishTracks,
     formatDuration,
   };
 };
