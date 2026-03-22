@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
-import Header from '../components/Header';
-import { useBroadcaster } from '../hooks/useBroadcaster';
-import { BroadcastStatus } from '../components/BrodcasterPanel/BroadcastStatus';
-import { MediaLibrary } from '../components/BrodcasterPanel/MediaLibrary';
-import { Playlist } from '../components/BrodcasterPanel/Playlist';
-import { AudioControls } from '../components/BrodcasterPanel/AudioControls';
-import { VideoBroadcast } from '../components/BrodcasterPanel/VideoBroadcast';
-import { AudienceMessages } from '../components/BrodcasterPanel/AudienceMessages';
-import { MessageStatistics } from '../components/BrodcasterPanel/MessageStatistics';
+import { useState, useMemo } from "react";
+import Header from "../components/Header";
+import { useBroadcaster } from "../hooks/useBroadcaster";
+import { BroadcastStatus } from "../components/BrodcasterPanel/BroadcastStatus";
+import { MediaLibrary } from "../components/BrodcasterPanel/MediaLibrary";
+import { Playlist } from "../components/BrodcasterPanel/Playlist";
+import { AudioControls } from "../components/BrodcasterPanel/AudioControls";
+import { AudienceMessages } from "../components/BrodcasterPanel/AudienceMessages";
+import { MessageStatistics } from "../components/BrodcasterPanel/MessageStatistics";
+import { VideoBroadcast } from "../components/BrodcasterPanel/VideoBroadcast";
 
-export type MessageStatus = 'new' | 'in-progress' | 'completed';
+export type MessageStatus = "new" | "in-progress" | "completed";
 
 export interface Message {
   id: number;
@@ -21,13 +21,41 @@ export interface Message {
 }
 
 const MOCK_MESSAGES: Message[] = [
-  { id: 1, user: 'user', text: 'Great music! Can you play some jazz next?', time: '2024-03-21 10:30', status: 'new', isVoice: false },
-  { id: 2, user: 'alexsmith', text: 'Voice message recording...', time: '2024-03-21 10:35', status: 'in-progress', isVoice: true },
-  { id: 3, user: 'user', text: 'Love the show! Keep it up!', time: '2024-03-21 10:40', status: 'new', isVoice: false },
+  {
+    id: 1,
+    user: "user",
+    text: "Great music! Can you play some jazz next?",
+    time: "2024-03-21 10:30",
+    status: "new",
+    isVoice: false,
+  },
+  {
+    id: 2,
+    user: "alexsmith",
+    text: "Voice message recording...",
+    time: "2024-03-21 10:35",
+    status: "in-progress",
+    isVoice: true,
+  },
+  {
+    id: 3,
+    user: "user",
+    text: "Love the show! Keep it up!",
+    time: "2024-03-21 10:40",
+    status: "new",
+    isVoice: false,
+  },
 ];
 
 const ARCHIVED_MESSAGES: Message[] = [
-  { id: 4, user: 'broadcaster2', text: 'Testing the feedback system', time: '2024-03-21 10:25', status: 'completed', isVoice: false },
+  {
+    id: 4,
+    user: "broadcaster2",
+    text: "Testing the feedback system",
+    time: "2024-03-21 10:25",
+    status: "completed",
+    isVoice: false,
+  },
 ];
 
 export default function BroadcasterPanel() {
@@ -35,14 +63,20 @@ export default function BroadcasterPanel() {
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
 
   const handleMessageStatus = (id: number, status: MessageStatus) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, status } : m));
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, status } : m)),
+    );
   };
 
-  const { newCount, inProgressCount, completedCount } = useMemo(() => ({
-    newCount: messages.filter(m => m.status === 'new').length,
-    inProgressCount: messages.filter(m => m.status === 'in-progress').length,
-    completedCount: messages.filter(m => m.status === 'completed').length,
-  }), [messages]);
+  const { newCount, inProgressCount, completedCount } = useMemo(
+    () => ({
+      newCount: messages.filter((m) => m.status === "new").length,
+      inProgressCount: messages.filter((m) => m.status === "in-progress")
+        .length,
+      completedCount: messages.filter((m) => m.status === "completed").length,
+    }),
+    [messages],
+  );
 
   const currentTrackForUI = useMemo(() => {
     const track = broadcaster.currentTrack;
@@ -69,15 +103,12 @@ export default function BroadcasterPanel() {
           <h1 className="text-3xl font-bold text-gray-900">
             Панель управления вещателя
           </h1>
-          <p className="text-gray-600">
-            Управляйте трансляцией и контентом
-          </p>
+          <p className="text-gray-600">Управляйте трансляцией и контентом</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ЛЕВАЯ ЧАСТЬ */}
           <div className="lg:col-span-2 space-y-6">
-
             <BroadcastStatus
               isBroadcasting={isBroadcasting}
               isLoading={broadcaster.botInfoLoading}
@@ -96,7 +127,6 @@ export default function BroadcasterPanel() {
               onSeek={broadcaster.handleSeek}
               formatDuration={broadcaster.formatDuration}
             />
-
             <MediaLibrary
               files={broadcaster.mediaFiles}
               isLoading={broadcaster.libraryLoading}
@@ -105,7 +135,6 @@ export default function BroadcasterPanel() {
               onDelete={broadcaster.handleDeleteFile}
               onAddToPlaylist={broadcaster.handleAddToPlaylist}
             />
-
             <Playlist
               tracks={broadcaster.playlist}
               currentTrackKey={currentTrackForUI?.key}
@@ -116,21 +145,24 @@ export default function BroadcasterPanel() {
               onRemove={broadcaster.handleRemoveFromPlaylist}
               onClear={broadcaster.handleClearQueue}
             />
-
             <AudioControls
               isRecording={broadcaster.isRecording}
               isMuted={isMuted}
               masterVolume={broadcaster.masterVolume}
-              onToggleRecording={() => broadcaster.setIsRecording(!broadcaster.isRecording)}
+              onToggleRecording={() =>
+                broadcaster.setIsRecording(!broadcaster.isRecording)
+              }
               onToggleMute={broadcaster.handleToggleMute}
-              onVolumeChange={broadcaster.setMasterVolume} isBroadcasting={false}            />
-
+              onVolumeChange={broadcaster.setMasterVolume}
+              isBroadcasting={false}
+            />
             <VideoBroadcast
               isVideoEnabled={isVideoEnabled}
               isBroadcasting={isBroadcasting}
               localStream={broadcaster.localStream}
               onToggleVideo={broadcaster.handleToggleVideo}
             />
+            ;
           </div>
 
           <div className="space-y-6">

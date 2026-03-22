@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   useGetBotInfoQuery,
   useGetLibraryQuery,
@@ -18,12 +17,27 @@ import {
   useConfirmUploadMutation,
   useDeleteFromLibraryMutation,
   useCreateLiveKitTokenMutation,
-} from '../services/livekit/livekitApi';
-import type { TrackItem, RepeatMode, MediaFile as ApiMediaFile } from '../services/livekit/types';
-import { uploadToS3 } from '../utils/livekit';
-import { getUserId } from '../utils/auth';
+} from "../services/livekit/livekitApi";
+import type {
+  Room,
+  LocalTrackPublication,
+  LocalVideoTrack,
+  LocalAudioTrack,
+} from "livekit-client";
+import {
+  Track,
+  createLocalVideoTrack,
+  createLocalAudioTrack,
+} from "livekit-client";
+import type {
+  TrackItem,
+  RepeatMode,
+  MediaFile as ApiMediaFile,
+} from "../services/livekit/types";
+import { uploadToS3 } from "../utils/livekit";
+import { getUserId } from "../utils/auth";
 
-const LIVEKIT_WS_URL = 'ws://95.174.104.223:7880';
+const LIVEKIT_WS_URL = "ws://95.174.104.223:7880";
 
 export const useBroadcaster = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -32,11 +46,21 @@ export const useBroadcaster = () => {
   const [isShuffle, setIsShuffle] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [liveKitRoom, setLiveKitRoom] = useState<any>(null);
+  const [liveKitRoom, setLiveKitRoom] = useState<Room | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [publishedTracks, setPublishedTracks] = useState<any[]>([]);
-  const userId = useMemo(() => getUserId() || '', []);
+  const [publishedTracks, setPublishedTracks] = useState<
+    LocalTrackPublication[]
+  >([]);
+
+  // Рефы для доступа к актуальным значениям внутри асинхронных колбэков
+  const liveKitRoomRef = useRef<Room | null>(null);
+  const isConnectedRef = useRef(false);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const isVideoEnabledRef = useRef(false);
+  const publishedTracksRef = useRef<LocalTrackPublication[]>([]);
+
+  const userId = useMemo(() => getUserId() || "", []);
 
   const {
     data: botInfo,
@@ -49,7 +73,10 @@ export const useBroadcaster = () => {
     data: libraryData,
     isLoading: libraryLoading,
     refetch: refetchLibrary,
-  } = useGetLibraryQuery(userId ? { user_id: userId, limit: 50 } : { user_id: '', limit: 50 }, { skip: !userId });
+  } = useGetLibraryQuery(
+    userId ? { user_id: userId, limit: 50 } : { user_id: "", limit: 50 },
+    { skip: !userId },
+  );
 
   const [addToQueue] = useAddToQueueMutation();
   const [removeFromQueue] = useRemoveFromQueueMutation();
@@ -67,20 +94,21 @@ export const useBroadcaster = () => {
   const [deleteFromLibrary] = useDeleteFromLibraryMutation();
   const [createLiveKitToken] = useCreateLiveKitTokenMutation();
 
-  const isBroadcasting = botInfo?.state === 'playing';
+  const isBroadcasting = botInfo?.state === "playing";
   const currentTrack = botInfo?.current;
   const isMuted = botInfo?.is_muted;
   const repeatMode = botInfo?.repeat_mode;
-  const isLoop = useMemo(() => repeatMode && repeatMode !== 'off', [repeatMode]);
+  const isLoop = useMemo(
+    () => repeatMode && repeatMode !== "off",
+    [repeatMode],
+  );
 
   const mediaFiles = useMemo(() => {
     if (!libraryData?.data) return [];
-    
     return libraryData.data.map((file: ApiMediaFile, idx: number) => {
-      const inPlaylist = botInfo?.queue?.some((track: TrackItem) => {
-        return track.src === file.src;
-      }) ?? false;
-      
+      const inPlaylist =
+        botInfo?.queue?.some((track: TrackItem) => track.src === file.src) ??
+        false;
       return {
         id: idx + 1,
         key: file.src,
@@ -98,16 +126,15 @@ export const useBroadcaster = () => {
 
   const playlist = useMemo(() => {
     if (!botInfo?.queue || !Array.isArray(botInfo.queue)) return [];
-    
     return botInfo.queue.map((track: TrackItem, idx: number) => {
-      const displayName = track.filename || track.src?.split('/').pop() || `Track ${idx + 1}`;
-      
+      const displayName =
+        track.filename || track.src?.split("/").pop() || `Track ${idx + 1}`;
       return {
         id: idx + 1,
         key: track.src,
         name: displayName,
         duration: formatDuration(track.duration),
-        kind: track.content_type?.startsWith('video/') ? 'video' : 'audio',
+        kind: track.content_type?.startsWith("video/") ? "video" : "audio",
         filename: track.filename,
         src: track.src,
         url: track.url,
@@ -116,183 +143,285 @@ export const useBroadcaster = () => {
   }, [botInfo?.queue]);
 
   const publishTracks = useCallback(async () => {
-    if (!liveKitRoom || !isConnected || !localStream) return;
-    
-    try {
-      const videoTrack = localStream.getVideoTracks()[0];
-      const audioTrack = localStream.getAudioTracks()[0];
-      const published: any[] = [];
-      
-      if (videoTrack) {
-        const publication = await liveKitRoom.localParticipant.publishTrack(videoTrack, {
-          source: 1,
-          name: 'camera',
-        });
-        published.push(publication);
-      }
-      
-      if (audioTrack) {
-        const publication = await liveKitRoom.localParticipant.publishTrack(audioTrack, {
-          source: 2,
-          name: 'microphone',
-        });
-        published.push(publication);
-      }
-      
-      setPublishedTracks(published);
-    } catch (err) {
-      console.error('Failed to publish tracks:', err);
+    const room = liveKitRoomRef.current;
+    const connected = isConnectedRef.current;
+
+    if (!room || !connected) {
+      console.warn("⚠️ Cannot publish: room or connection missing");
+      return;
     }
-  }, [liveKitRoom, isConnected, localStream]);
+
+    try {
+      const published: LocalTrackPublication[] = [];
+
+      // ВИДЕО
+      if (isVideoEnabledRef.current) {
+        console.log("📹 Creating LocalVideoTrack via LiveKit...");
+
+        const localVideoTrack = await createLocalVideoTrack({
+          facingMode: "user",
+        });
+
+        console.log("📹 Track ready:", {
+          readyState: localVideoTrack.mediaStreamTrack.readyState,
+          settings: localVideoTrack.mediaStreamTrack.getSettings(),
+          dimensions: localVideoTrack.dimensions,
+        });
+
+        const publication = await room.localParticipant.publishTrack(
+          localVideoTrack,
+          {
+            source: Track.Source.Camera,
+            name: "camera",
+            videoEncoding: {
+              maxBitrate: 2_000_000,
+              maxFramerate: 30,
+            },
+          },
+        );
+
+        console.log("✅ Video published:", publication.trackSid);
+        published.push(publication);
+      }
+
+      // АУДИО
+      console.log("🎤 Creating LocalAudioTrack...");
+      const localAudioTrack = await createLocalAudioTrack({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      });
+
+      const audioPublication = await room.localParticipant.publishTrack(
+        localAudioTrack,
+        {
+          source: Track.Source.Microphone,
+          name: "microphone",
+          dtx: true,
+          red: false,
+        },
+      );
+
+      console.log("✅ Audio published:", audioPublication.trackSid);
+      published.push(audioPublication);
+
+      // Обновляем стейт и рефы
+      setPublishedTracks(published);
+      publishedTracksRef.current = published;
+
+      console.log("📡 All tracks published:", published.length);
+      return published;
+    } catch (err) {
+      console.error("❌ Failed to publish tracks:", err);
+      throw err;
+    }
+  }, []);
 
   const unpublishTracks = useCallback(async () => {
-    if (!liveKitRoom || !isConnected) return;
-    
+    const room = liveKitRoomRef.current;
+    const connected = isConnectedRef.current;
+    const tracks = publishedTracksRef.current;
+
+    if (!room || !connected || !tracks.length) return;
+
     try {
-      for (const publication of publishedTracks) {
+      for (const publication of tracks) {
         if (publication.track) {
-          await liveKitRoom.localParticipant.unpublishTrack(publication.track);
+          await room.localParticipant.unpublishTrack(publication.track);
+          // LocalTrack имеет метод stop(), у RemoteTrack — нет, поэтому проверка
+          if ("stop" in publication.track) {
+            (publication.track as LocalVideoTrack | LocalAudioTrack).stop();
+          }
         }
       }
       setPublishedTracks([]);
+      publishedTracksRef.current = [];
+      console.log("✅ Tracks unpublished");
     } catch (err) {
-      console.error('Failed to unpublish tracks:', err);
+      console.error("❌ Failed to unpublish tracks:", err);
     }
-  }, [liveKitRoom, isConnected, publishedTracks]);
+  }, []);
 
-  const handleAddToPlaylist = useCallback(async (src: string) => {
-    try {
-      await addToQueue([src]).unwrap();
-      await refetchBotInfo();
-    } catch (err) {
-      console.error('Add to queue failed:', err);
-    }
-  }, [addToQueue, refetchBotInfo]);
+  const handleAddToPlaylist = useCallback(
+    async (src: string) => {
+      try {
+        await addToQueue([src]).unwrap();
+        await refetchBotInfo();
+      } catch (err) {
+        console.error("Add to queue failed:", err);
+      }
+    },
+    [addToQueue, refetchBotInfo],
+  );
 
-  const handleRemoveFromPlaylist = useCallback(async (index: number) => {
-    try {
-      await removeFromQueue({ index }).unwrap();
-      await refetchBotInfo();
-    } catch (err) {
-      console.error('Remove failed:', err);
-    }
-  }, [removeFromQueue, refetchBotInfo]);
+  const handleRemoveFromPlaylist = useCallback(
+    async (index: number) => {
+      try {
+        await removeFromQueue({ index }).unwrap();
+        await refetchBotInfo();
+      } catch (err) {
+        console.error("Remove failed:", err);
+      }
+    },
+    [removeFromQueue, refetchBotInfo],
+  );
 
   const handleClearQueue = useCallback(async () => {
-    if (!confirm('Очистить плейлист?')) return;
+    if (!confirm("Очистить плейлист?")) return;
     try {
       await clearQueue().unwrap();
       await refetchBotInfo();
     } catch (err) {
-      console.error('Clear failed:', err);
+      console.error("Clear failed:", err);
     }
   }, [clearQueue, refetchBotInfo]);
 
   const handleToggleBroadcast = useCallback(async () => {
     if (isBroadcasting) {
+      // === ОСТАНОВКА ===
       await playerStop().unwrap();
+
       if (liveKitRoom) {
         await unpublishTracks();
         liveKitRoom.disconnect();
         setLiveKitRoom(null);
         setIsConnected(false);
-        if (localStream) {
-          localStream.getTracks().forEach(track => track.stop());
-          setLocalStream(null);
-        }
+      }
+
+      // Останавливаем локальные треки
+      if (localStream) {
+        localStream.getTracks().forEach((track) => track.stop());
+        setLocalStream(null);
+        localStreamRef.current = null;
       }
     } else {
+      // === ЗАПУСК ===
       try {
         const tokenData = await createLiveKitToken({
           id: `broadcaster-${Date.now()}`,
-          username: 'Broadcaster',
-          role: 'Leading',
+          username: "Broadcaster",
+          role: "Leading",
         }).unwrap();
-        
-        console.log('LiveKit token received:', tokenData.token);
-        
-        const { Room, RoomEvent } = await import('livekit-client');
-        
+
+        const { Room, RoomEvent } = await import("livekit-client");
         const room = new Room({
           adaptiveStream: true,
           dynacast: true,
         });
-        
-        room.on(RoomEvent.Connected, () => {
-          console.log('Connected to LiveKit room:', room.name);
+
+        room.on(RoomEvent.Connected, async () => {
+          console.log("✅ Connected to LiveKit room:", room.name);
           setIsConnected(true);
           setLiveKitRoom(room);
-          playerPlay().unwrap();
+          liveKitRoomRef.current = room;
+          isConnectedRef.current = true;
+
+          try {
+            console.log("isConnectedRef:", isConnectedRef.current);
+            console.log("roomRef:", !!liveKitRoomRef.current);
+            console.log("📡 Starting track publication...");
+            await publishTracks();
+            console.log("✅ Track publication complete");
+          } catch (err) {
+            console.error("❌ Failed to publish tracks after connect:", err);
+          }
+
+          await playerPlay().unwrap();
         });
-        
+
         room.on(RoomEvent.Disconnected, () => {
-          console.log('Disconnected from LiveKit');
+          console.log("❌ Disconnected from LiveKit");
           setIsConnected(false);
           setLiveKitRoom(null);
+          setPublishedTracks([]);
+          publishedTracksRef.current = [];
         });
-        
-        room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
-          console.log(`Track subscribed: ${track.kind} from ${participant.identity}`);
-          if (track.kind === 'video') {
-            const element = track.attach();
-            const videoContainer = document.getElementById('remote-video');
-            if (videoContainer) {
-              videoContainer.appendChild(element);
+
+        room.on(
+          RoomEvent.TrackSubscribed,
+          (track, _publication, participant) => {
+            console.log(
+              `📥 Track subscribed: ${track.kind} from ${participant.identity}`,
+            );
+            if (track.kind === "video") {
+              const element = track.attach();
+              const videoContainer = document.getElementById("remote-video");
+              if (videoContainer) {
+                videoContainer.innerHTML = "";
+                videoContainer.appendChild(element);
+              }
             }
-          }
-          if (track.kind === 'audio') {
-            track.attach();
-          }
-        });
-        
+          },
+        );
+
         await room.connect(LIVEKIT_WS_URL, tokenData.token);
-        
       } catch (err) {
-        console.error('Failed to start broadcast:', err);
-        alert('Не удалось начать вещание');
+        console.error("❌ Failed to start broadcast:", err);
+        alert("Не удалось начать вещание: " + (err as Error).message);
+
+        // Cleanup при ошибке
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach((t) => t.stop());
+          localStreamRef.current = null;
+          setLocalStream(null);
+        }
       }
     }
-  }, [isBroadcasting, createLiveKitToken, playerPlay, playerStop, liveKitRoom, unpublishTracks, localStream]);
+  }, [
+    isBroadcasting,
+    createLiveKitToken,
+    playerPlay,
+    playerStop,
+    publishTracks,
+    unpublishTracks,
+    liveKitRoom,
+    localStream,
+  ]);
 
-  const handleFileUpload = useCallback(async (file: File): Promise<void> => {
-    if (!userId) {
-      alert('Ошибка: пользователь не авторизован');
-      return;
-    }
-    
-    try {
-      const intent = await getUploadIntent({
-        user_id: userId,
-        content_type: file.type,
-        filename: file.name,
-        size: file.size,
-      }).unwrap();
-      
-      setUploadProgress(0);
-      await uploadToS3(file, intent.url, intent.fields, (progress) => setUploadProgress(progress));
-      
-      await confirmUpload({ key: intent.fields.key }).unwrap();
-      await refetchLibrary();
-      alert(`Файл "${file.name}" успешно загружен!`);
-    } catch (err) {
-      console.error('Upload failed:', err);
-      alert('Ошибка загрузки файла');
-    } finally {
-      setUploadProgress(0);
-    }
-  }, [getUploadIntent, confirmUpload, refetchLibrary, userId]);
+  const handleFileUpload = useCallback(
+    async (file: File): Promise<void> => {
+      if (!userId) {
+        alert("Ошибка: пользователь не авторизован");
+        return;
+      }
+      try {
+        const intent = await getUploadIntent({
+          user_id: userId,
+          content_type: file.type,
+          filename: file.name,
+          size: file.size,
+        }).unwrap();
+        setUploadProgress(0);
+        await uploadToS3(file, intent.url, intent.fields, (progress) =>
+          setUploadProgress(progress),
+        );
+        await confirmUpload({ key: intent.fields.key }).unwrap();
+        await refetchLibrary();
+        alert(`Файл "${file.name}" успешно загружен!`);
+      } catch (err) {
+        console.error("Upload failed:", err);
+        alert("Ошибка загрузки файла");
+      } finally {
+        setUploadProgress(0);
+      }
+    },
+    [getUploadIntent, confirmUpload, refetchLibrary, userId],
+  );
 
-  const handleDeleteFile = useCallback(async (key: string) => {
-    if (!confirm('Удалить этот файл?')) return;
-    try {
-      await deleteFromLibrary({ key }).unwrap();
-      refetchLibrary();
-      refetchBotInfo();
-    } catch (err) {
-      console.error('Delete failed:', err);
-      alert('Не удалось удалить');
-    }
-  }, [deleteFromLibrary, refetchLibrary, refetchBotInfo]);
+  const handleDeleteFile = useCallback(
+    async (key: string) => {
+      if (!confirm("Удалить этот файл?")) return;
+      try {
+        await deleteFromLibrary({ key }).unwrap();
+        refetchLibrary();
+        refetchBotInfo();
+      } catch (err) {
+        console.error("Delete failed:", err);
+        alert("Не удалось удалить");
+      }
+    },
+    [deleteFromLibrary, refetchLibrary, refetchBotInfo],
+  );
 
   const handlePlay = useCallback(async () => {
     await playerPlay().unwrap();
@@ -300,7 +429,7 @@ export const useBroadcaster = () => {
   }, [playerPlay, refetchBotInfo]);
 
   const handlePause = useCallback(async () => {
-    await playerPause().unwrap();
+    await playerPause({}).unwrap();
     await refetchBotInfo();
   }, [playerPause, refetchBotInfo]);
 
@@ -320,12 +449,12 @@ export const useBroadcaster = () => {
   }, [playerPrevious, refetchBotInfo]);
 
   const handleToggleLoop = useCallback(async () => {
-    const newMode: RepeatMode = isLoop ? 'off' : 'playlist';
+    const newMode: RepeatMode = isLoop ? "off" : "playlist";
     try {
       await playerSetRepeatMode({ mode: newMode }).unwrap();
       await refetchBotInfo();
     } catch (err) {
-      console.error('Set repeat mode failed:', err);
+      console.error("Set repeat mode failed:", err);
     }
   }, [isLoop, playerSetRepeatMode, refetchBotInfo]);
 
@@ -334,44 +463,94 @@ export const useBroadcaster = () => {
       await playerSetMute({ muted: !isMuted }).unwrap();
       await refetchBotInfo();
     } catch (err) {
-      console.error('Mute failed:', err);
+      console.error("Mute failed:", err);
     }
   }, [isMuted, playerSetMute, refetchBotInfo]);
 
-  const handleSeek = useCallback(async (positionSec: number) => {
-    try {
-      await playerSetPosition({ position_sec: positionSec }).unwrap();
-      await refetchBotInfo();
-    } catch (err) {
-      console.error('Seek failed:', err);
-    }
-  }, [playerSetPosition, refetchBotInfo]);
+  const handleSeek = useCallback(
+    async (positionSec: number) => {
+      try {
+        await playerSetPosition({ position_sec: positionSec }).unwrap();
+        await refetchBotInfo();
+      } catch (err) {
+        console.error("Seek failed:", err);
+      }
+    },
+    [playerSetPosition, refetchBotInfo],
+  );
 
   const handleToggleVideo = useCallback(async () => {
     if (!isVideoEnabled) {
+      // === ВКЛЮЧЕНИЕ ===
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        setLocalStream(stream);
+        console.log("🎥 Requesting camera access...");
+
+        // Просто обновляем реф — createLocalVideoTrack сам запросит доступ
+        isVideoEnabledRef.current = true;
         setIsVideoEnabled(true);
-        
-        if (liveKitRoom && isConnected) {
-          await publishTracks();
+
+        // Если уже в комнате — публикуем видео
+        if (liveKitRoomRef.current && isConnectedRef.current) {
+          try {
+            console.log("isConnectedRef:", isConnectedRef.current);
+            console.log("roomRef:", !!liveKitRoomRef.current);
+            console.log("📡 Publishing video track...");
+            await publishTracks();
+          } catch (err) {
+            console.error("Failed to publish video track:", err);
+          }
         }
       } catch (err) {
-        console.error('Failed to access camera:', err);
-        alert('Не удалось получить доступ к камере');
+        console.error("❌ Failed to access camera:", err);
+        alert("Не удалось получить доступ к камере: " + (err as Error).message);
+        isVideoEnabledRef.current = false;
+        setIsVideoEnabled(false);
       }
     } else {
+      // === ВЫКЛЮЧЕНИЕ ===
+      console.log("📴 Disabling video...");
+      isVideoEnabledRef.current = false;
       setIsVideoEnabled(false);
-      if (liveKitRoom && isConnected) {
-        await unpublishTracks();
-      }
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        setLocalStream(null);
+
+      // Снимаем с публикации только видео-треки
+      const room = liveKitRoomRef.current;
+      if (room) {
+        for (const pub of publishedTracksRef.current) {
+          if (pub.track?.kind === "video" && "stop" in pub.track) {
+            await room.localParticipant.unpublishTrack(pub.track);
+            (pub.track as LocalVideoTrack).stop();
+            console.log("🎬 Video track unpublished");
+          }
+        }
+        // Обновляем стейт, оставляя аудио
+        const remaining = publishedTracksRef.current.filter(
+          (p) => p.track?.kind !== "video",
+        );
+        setPublishedTracks(remaining);
+        publishedTracksRef.current = remaining;
       }
     }
-  }, [isVideoEnabled, liveKitRoom, isConnected, publishTracks, unpublishTracks, localStream]);
+  }, [isVideoEnabled, publishTracks]);
+
+  useEffect(() => {
+    liveKitRoomRef.current = liveKitRoom;
+  }, [liveKitRoom]);
+
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
+
+  useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
+
+  useEffect(() => {
+    isVideoEnabledRef.current = isVideoEnabled;
+  }, [isVideoEnabled]);
+
+  useEffect(() => {
+    publishedTracksRef.current = publishedTracks;
+  }, [publishedTracks]);
 
   useEffect(() => {
     return () => {
@@ -379,10 +558,16 @@ export const useBroadcaster = () => {
         liveKitRoom.disconnect();
       }
       if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
+        localStream.getTracks().forEach((track) => track.stop());
       }
+      // Останавливаем треки LiveKit
+      publishedTracks.forEach((pub) => {
+        if (pub.track && "stop" in pub.track) {
+          (pub.track as LocalVideoTrack | LocalAudioTrack).stop();
+        }
+      });
     };
-  }, [liveKitRoom, localStream]);
+  }, [liveKitRoom, localStream, publishedTracks]);
 
   return {
     isBroadcasting,
@@ -432,8 +617,8 @@ export const useBroadcaster = () => {
 };
 
 export function formatDuration(seconds: number): string {
-  if (!seconds || isNaN(seconds)) return '0:00';
+  if (!seconds || isNaN(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }

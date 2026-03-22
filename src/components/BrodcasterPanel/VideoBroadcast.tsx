@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from "react";
 
 interface VideoBroadcastProps {
   isVideoEnabled: boolean;
@@ -15,16 +15,13 @@ export const VideoBroadcast: React.FC<VideoBroadcastProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Подключаем MediaStream к video element
   useEffect(() => {
     if (videoRef.current && localStream) {
       videoRef.current.srcObject = localStream;
-      console.log('Local preview active');
+      console.log("🎬 Local preview updated");
     }
   }, [localStream]);
-
-  const handleToggleVideo = async () => {
-    await onToggleVideo();
-  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -43,18 +40,25 @@ export const VideoBroadcast: React.FC<VideoBroadcastProps> = ({
       </div>
 
       <button
-        onClick={handleToggleVideo}
+        onClick={onToggleVideo}
         className={`w-full py-3 px-6 rounded-xl font-medium transition-all flex items-center justify-center gap-2 mb-4 ${
           isVideoEnabled
-            ? 'bg-red-600 hover:bg-red-700 text-white'
-            : 'bg-green-600 hover:bg-green-700 text-white'
+            ? "bg-red-600 hover:bg-red-700 text-white"
+            : "bg-green-600 hover:bg-green-700 text-white"
         }`}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
           <circle cx="12" cy="13" r="4" />
         </svg>
-        {isVideoEnabled ? 'Выключить видео' : 'Включить видео'}
+        {isVideoEnabled ? "Выключить видео" : "Включить видео"}
       </button>
 
       {isVideoEnabled && (
@@ -68,17 +72,30 @@ export const VideoBroadcast: React.FC<VideoBroadcastProps> = ({
           />
           {!localStream && (
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="mb-3">
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="1.5"
+                className="mb-3"
+              >
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
-              <p className="text-white font-medium">Запрос доступа к камере...</p>
-              <p className="text-gray-400 text-sm mt-1">Разрешите доступ к камере и микрофону</p>
+              <p className="text-white font-medium">
+                Запрос доступа к камере...
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                Разрешите доступ к камере и микрофону
+              </p>
             </div>
           )}
           {localStream && isBroadcasting && (
-            <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-              📡 Трансляция активна
+            <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span>📡 Трансляция активна</span>
             </div>
           )}
         </div>
@@ -86,13 +103,23 @@ export const VideoBroadcast: React.FC<VideoBroadcastProps> = ({
 
       {!isVideoEnabled && (
         <div className="aspect-video bg-gray-100 rounded-xl flex flex-col items-center justify-center">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-3 text-gray-400">
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className="mb-3 text-gray-400"
+          >
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
             <circle cx="12" cy="13" r="4" />
           </svg>
           <p className="text-gray-500">Видео отключено</p>
           <p className="text-gray-400 text-sm mt-1">
-            {isBroadcasting ? 'Аудио продолжает транслироваться' : 'Нажмите "Включить видео" для начала трансляции'}
+            {isBroadcasting
+              ? "Аудио продолжает транслироваться"
+              : 'Нажмите "Включить видео" для начала'}
           </p>
         </div>
       )}
@@ -101,11 +128,13 @@ export const VideoBroadcast: React.FC<VideoBroadcastProps> = ({
         <div className="mt-3 p-3 bg-gray-50 rounded-lg">
           <p className="text-xs text-gray-500 flex items-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            {isBroadcasting ? 'Видео транслируется в эфир' : 'Предпросмотр видео'}
+            {isBroadcasting
+              ? "Видео транслируется в эфир"
+              : "Предпросмотр видео"}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {localStream.getVideoTracks()[0]?.label || 'Камера'} • 
-            {localStream.getAudioTracks()[0]?.label || 'Микрофон'}
+            {localStream.getVideoTracks()[0]?.label || "Камера"} •
+            {localStream.getAudioTracks()[0]?.label || "Микрофон"}
           </p>
         </div>
       )}
