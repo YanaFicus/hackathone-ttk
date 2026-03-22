@@ -24,11 +24,7 @@ import type {
   LocalVideoTrack,
   LocalAudioTrack,
 } from "livekit-client";
-import {
-  Track,
-  createLocalVideoTrack,
-  createLocalAudioTrack,
-} from "livekit-client";
+import { Track, createLocalVideoTrack } from "livekit-client";
 import type {
   TrackItem,
   RepeatMode,
@@ -142,80 +138,90 @@ export const useBroadcaster = () => {
     });
   }, [botInfo?.queue]);
 
-  const publishTracks = useCallback(async () => {
+  const publishVideoTrack = useCallback(async () => {
     const room = liveKitRoomRef.current;
     const connected = isConnectedRef.current;
 
-    if (!room || !connected) {
-      console.warn("⚠️ Cannot publish: room or connection missing");
-      return;
-    }
+    if (!room || !connected || !isVideoEnabledRef.current) return;
+
+    const existingVideoPub = publishedTracksRef.current.find(
+      (p) => p.track?.kind === "video",
+    );
+    if (existingVideoPub) return existingVideoPub;
 
     try {
-      const published: LocalTrackPublication[] = [];
-
-      // ВИДЕО
-      if (isVideoEnabledRef.current) {
-        console.log("📹 Creating LocalVideoTrack via LiveKit...");
-
-        const localVideoTrack = await createLocalVideoTrack({
-          facingMode: "user",
-        });
-
-        console.log("📹 Track ready:", {
-          readyState: localVideoTrack.mediaStreamTrack.readyState,
-          settings: localVideoTrack.mediaStreamTrack.getSettings(),
-          dimensions: localVideoTrack.dimensions,
-        });
-
-        const publication = await room.localParticipant.publishTrack(
-          localVideoTrack,
-          {
-            source: Track.Source.Camera,
-            name: "camera",
-            videoEncoding: {
-              maxBitrate: 2_000_000,
-              maxFramerate: 30,
-            },
-          },
-        );
-
-        console.log("✅ Video published:", publication.trackSid);
-        published.push(publication);
-      }
-
-      // АУДИО
-      console.log("🎤 Creating LocalAudioTrack...");
-      const localAudioTrack = await createLocalAudioTrack({
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
+      const localVideoTrack = await createLocalVideoTrack({
+        facingMode: "user",
       });
 
-      const audioPublication = await room.localParticipant.publishTrack(
-        localAudioTrack,
+      const publication = await room.localParticipant.publishTrack(
+        localVideoTrack,
         {
-          source: Track.Source.Microphone,
-          name: "microphone",
-          dtx: true,
-          red: false,
+          source: Track.Source.Camera,
+          name: "camera",
+          videoEncoding: {
+            maxBitrate: 2_000_000,
+            maxFramerate: 30,
+          },
         },
       );
 
-      console.log("✅ Audio published:", audioPublication.trackSid);
-      published.push(audioPublication);
+      const updated = [...publishedTracksRef.current, publication];
+      setPublishedTracks(updated);
+      publishedTracksRef.current = updated;
 
-      // Обновляем стейт и рефы
-      setPublishedTracks(published);
-      publishedTracksRef.current = published;
-
-      console.log("📡 All tracks published:", published.length);
-      return published;
+      return publication;
     } catch (err) {
-      console.error("❌ Failed to publish tracks:", err);
+      console.error("Failed to publish video track:", err);
       throw err;
     }
   }, []);
+
+  const handleToggleRecording = useCallback(async () => {
+    const room = liveKitRoomRef.current;
+    const connected = isConnectedRef.current;
+
+    if (!room || !connected) return;
+
+    try {
+      if (!isRecording) {
+        const publication = await room.localParticipant.setMicrophoneEnabled(
+          true,
+          {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          {
+            source: Track.Source.Microphone,
+            name: "microphone",
+            dtx: true,
+            red: false,
+          },
+        );
+
+        if (publication) {
+          const exists = publishedTracksRef.current.some(
+            (p) => p.trackSid === publication.trackSid,
+          );
+
+          if (!exists) {
+            const updated = [...publishedTracksRef.current, publication];
+            setPublishedTracks(updated);
+            publishedTracksRef.current = updated;
+          }
+        }
+
+        setIsRecording(true);
+      } else {
+        await room.localParticipant.setMicrophoneEnabled(false);
+        setIsRecording(false);
+      }
+    } catch (err) {
+      console.error("Failed to toggle microphone:", err);
+      alert("Не удалось включить микрофон: " + (err as Error).message);
+    }
+  }, [isRecording]);
 
   const unpublishTracks = useCallback(async () => {
     const room = liveKitRoomRef.current;
@@ -227,18 +233,14 @@ export const useBroadcaster = () => {
     try {
       for (const publication of tracks) {
         if (publication.track) {
-          await room.localParticipant.unpublishTrack(publication.track);
-          // LocalTrack имеет метод stop(), у RemoteTrack — нет, поэтому проверка
-          if ("stop" in publication.track) {
-            (publication.track as LocalVideoTrack | LocalAudioTrack).stop();
-          }
+          await room.localParticipant.unpublishTrack(publication.track, true);
         }
       }
+
       setPublishedTracks([]);
       publishedTracksRef.current = [];
-      console.log("✅ Tracks unpublished");
     } catch (err) {
-      console.error("❌ Failed to unpublish tracks:", err);
+      console.error("Failed to unpublish tracks:", err);
     }
   }, []);
 
@@ -281,12 +283,24 @@ export const useBroadcaster = () => {
     // === 🔴 ОСТАНОВКА ===
     await playerStop().unwrap();
 
-    if (liveKitRoom) {
-      await unpublishTracks();
-      liveKitRoom.disconnect();
+      if (liveKitRoomRef.current) {
+        try {
+          await liveKitRoomRef.current.localParticipant.setMicrophoneEnabled(
+            false,
+          );
+        } catch (err) {
+          console.error("Failed to disable mic:", err);
+        }
+
+        await unpublishTracks();
+        liveKitRoomRef.current.disconnect();
+      }
+
       setLiveKitRoom(null);
+      liveKitRoomRef.current = null;
       setIsConnected(false);
-    }
+      isConnectedRef.current = false;
+      setIsRecording(false);
 
     // Останавливаем локальные треки
     if (localStream) {
@@ -327,13 +341,13 @@ export const useBroadcaster = () => {
         if (liveKitRoomRef.current) liveKitRoomRef.current = room;
         if (isConnectedRef.current) isConnectedRef.current = true;
 
-        try {
-          console.log("📡 Starting track publication...");
-          await publishTracks();
-          console.log("✅ Track publication complete");
-        } catch (err) {
-          console.error("❌ Failed to publish tracks after connect:", err);
-        }
+          try {
+            if (isVideoEnabledRef.current) {
+              await publishVideoTrack();
+            }
+          } catch (err) {
+            console.error("Failed to publish video after connect:", err);
+          }
 
         await playerPlay().unwrap();
         // 🔥 FIX: устанавливаем isBroadcasting только после успешного подключения
@@ -372,24 +386,23 @@ export const useBroadcaster = () => {
       console.error("❌ Failed to start broadcast:", err);
       alert("Не удалось начать вещание: " + (err as Error).message);
 
-      // Cleanup при ошибке
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((t) => t.stop());
-        localStreamRef.current = null;
-        setLocalStream(null);
+        // Cleanup при ошибке
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach((t) => t.stop());
+          localStreamRef.current = null;
+          setLocalStream(null);
+        }
       }
     }
-  }
-}, [
-  isBroadcasting,
-  createLiveKitToken,
-  playerPlay,
-  playerStop,
-  publishTracks,
-  unpublishTracks,
-  liveKitRoom,
-  localStream,
-]);
+  }, [
+    isBroadcasting,
+    createLiveKitToken,
+    playerPlay,
+    playerStop,
+    unpublishTracks,
+    liveKitRoom,
+    localStream,
+  ]);
 
   const handleFileUpload = useCallback(
     async (file: File): Promise<void> => {
@@ -494,48 +507,30 @@ export const useBroadcaster = () => {
 
   const handleToggleVideo = useCallback(async () => {
     if (!isVideoEnabled) {
-      // === ВКЛЮЧЕНИЕ ===
       try {
-        console.log("🎥 Requesting camera access...");
-
-        // Просто обновляем реф — createLocalVideoTrack сам запросит доступ
         isVideoEnabledRef.current = true;
         setIsVideoEnabled(true);
 
-        // Если уже в комнате — публикуем видео
         if (liveKitRoomRef.current && isConnectedRef.current) {
-          try {
-            console.log("isConnectedRef:", isConnectedRef.current);
-            console.log("roomRef:", !!liveKitRoomRef.current);
-            console.log("📡 Publishing video track...");
-            await publishTracks();
-          } catch (err) {
-            console.error("Failed to publish video track:", err);
-          }
+          await publishVideoTrack();
         }
       } catch (err) {
-        console.error("❌ Failed to access camera:", err);
         alert("Не удалось получить доступ к камере: " + (err as Error).message);
         isVideoEnabledRef.current = false;
         setIsVideoEnabled(false);
       }
     } else {
-      // === ВЫКЛЮЧЕНИЕ ===
-      console.log("📴 Disabling video...");
       isVideoEnabledRef.current = false;
       setIsVideoEnabled(false);
 
-      // Снимаем с публикации только видео-треки
       const room = liveKitRoomRef.current;
       if (room) {
         for (const pub of publishedTracksRef.current) {
-          if (pub.track?.kind === "video" && "stop" in pub.track) {
-            await room.localParticipant.unpublishTrack(pub.track);
-            (pub.track as LocalVideoTrack).stop();
-            console.log("🎬 Video track unpublished");
+          if (pub.track?.kind === "video") {
+            await room.localParticipant.unpublishTrack(pub.track, true);
           }
         }
-        // Обновляем стейт, оставляя аудио
+
         const remaining = publishedTracksRef.current.filter(
           (p) => p.track?.kind !== "video",
         );
@@ -543,7 +538,7 @@ export const useBroadcaster = () => {
         publishedTracksRef.current = remaining;
       }
     }
-  }, [isVideoEnabled, publishTracks]);
+  }, [isVideoEnabled, publishVideoTrack]);
 
   useEffect(() => {
     liveKitRoomRef.current = liveKitRoom;
@@ -609,6 +604,8 @@ export const useBroadcaster = () => {
     localStream,
     publishedTracks,
     handleToggleBroadcast,
+    publishVideoTrack,
+    handleToggleRecording,
     handleFileUpload,
     handleDeleteFile,
     handleAddToPlaylist,
@@ -623,7 +620,6 @@ export const useBroadcaster = () => {
     handleToggleMute,
     handleSeek,
     handleToggleVideo,
-    publishTracks,
     unpublishTracks,
     formatDuration,
   };

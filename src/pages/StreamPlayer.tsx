@@ -66,8 +66,24 @@ export default function StreamPlayer() {
 
   // 🔥 Автоскролл чата к новым сообщениям
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const handleUserGesture = () => {
+      // Разрешаем AudioContext после первого клика
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      }
+      // Убираем обработчик после первого срабатывания
+      document.removeEventListener("click", handleUserGesture);
+      document.removeEventListener("touchstart", handleUserGesture);
+    };
+
+    document.addEventListener("click", handleUserGesture);
+    document.addEventListener("touchstart", handleUserGesture);
+
+    return () => {
+      document.removeEventListener("click", handleUserGesture);
+      document.removeEventListener("touchstart", handleUserGesture);
+    };
+  }, []);
 
   const connectToStream = async () => {
     if (isConnected || isConnecting) return;
@@ -111,12 +127,23 @@ export default function StreamPlayer() {
         }
       });
 
-      newRoom.on(RoomEvent.TrackUnsubscribed, (track) => {
-        if (track.kind === "video") {
-          setHasVideo(false);
-          if (videoRef.current) videoRef.current.srcObject = null;
-        }
-      });
+      newRoom.on(
+        RoomEvent.TrackUnsubscribed,
+        (track, _publication, participant) => {
+          console.log(
+            `Track unsubscribed: ${track.kind} from ${participant.identity}`,
+          );
+
+          if (track.kind === "audio" && audioRef.current) {
+            audioRef.current.srcObject = null;
+          }
+
+          if (track.kind === "video" && videoRef.current) {
+            videoRef.current.srcObject = null;
+            setHasVideo(false);
+          }
+        },
+      );
 
       newRoom.on(RoomEvent.ParticipantConnected, (participant) => {
         console.log(`Participant connected: ${participant.identity}`);
