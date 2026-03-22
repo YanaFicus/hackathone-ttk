@@ -24,7 +24,7 @@ const clearUserData = () => {
 };
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost:7000/api/auth",
+  baseUrl: "http://95.174.104.223:7401/api/auth",
   prepareHeaders: (headers) => {
     const token = localStorage.getItem("accessToken");
 

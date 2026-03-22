@@ -94,7 +94,7 @@ export const useBroadcaster = () => {
   const [deleteFromLibrary] = useDeleteFromLibraryMutation();
   const [createLiveKitToken] = useCreateLiveKitTokenMutation();
 
-  const isBroadcasting = botInfo?.state === "playing";
+   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const currentTrack = botInfo?.current;
   const isMuted = botInfo?.is_muted;
   const repeatMode = botInfo?.repeat_mode;
@@ -277,106 +277,119 @@ export const useBroadcaster = () => {
   }, [clearQueue, refetchBotInfo]);
 
   const handleToggleBroadcast = useCallback(async () => {
-    if (isBroadcasting) {
-      // === ОСТАНОВКА ===
-      await playerStop().unwrap();
+  if (isBroadcasting) {
+    // === 🔴 ОСТАНОВКА ===
+    await playerStop().unwrap();
 
-      if (liveKitRoom) {
-        await unpublishTracks();
-        liveKitRoom.disconnect();
-        setLiveKitRoom(null);
-        setIsConnected(false);
+    if (liveKitRoom) {
+      await unpublishTracks();
+      liveKitRoom.disconnect();
+      setLiveKitRoom(null);
+      setIsConnected(false);
+    }
+
+    // Останавливаем локальные треки
+    if (localStream) {
+      localStream.getTracks().forEach((track) => track.stop());
+      setLocalStream(null);
+      if (localStreamRef.current) localStreamRef.current = null;
+    }
+    
+    setIsBroadcasting(false);
+    
+  } else {
+    // === 🟢 ЗАПУСК ===
+    try {
+      // 🔥 FIX: получаем userId ЗДЕСЬ, где он нужен
+      const realUserId = getUserId();
+      
+      if (!realUserId) {
+        alert('Пользователь не авторизован');
+        return;
       }
 
-      // Останавливаем локальные треки
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
-        setLocalStream(null);
-        localStreamRef.current = null;
-      }
-    } else {
-      // === ЗАПУСК ===
-      try {
-        const tokenData = await createLiveKitToken({
-          id: `broadcaster-${Date.now()}`,
-          username: "Broadcaster",
-          role: "Leading",
-        }).unwrap();
+      const tokenData = await createLiveKitToken({
+        id: realUserId,
+        username: "Broadcaster",
+        role: "Leading",
+      }).unwrap();
 
-        const { Room, RoomEvent } = await import("livekit-client");
-        const room = new Room({
-          adaptiveStream: true,
-          dynacast: true,
-        });
+      const { Room, RoomEvent } = await import("livekit-client");
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      });
 
-        room.on(RoomEvent.Connected, async () => {
-          console.log("✅ Connected to LiveKit room:", room.name);
-          setIsConnected(true);
-          setLiveKitRoom(room);
-          liveKitRoomRef.current = room;
-          isConnectedRef.current = true;
+      room.on(RoomEvent.Connected, async () => {
+        console.log("✅ Connected to LiveKit room:", room.name);
+        setIsConnected(true);
+        setLiveKitRoom(room);
+        if (liveKitRoomRef.current) liveKitRoomRef.current = room;
+        if (isConnectedRef.current) isConnectedRef.current = true;
 
-          try {
-            console.log("isConnectedRef:", isConnectedRef.current);
-            console.log("roomRef:", !!liveKitRoomRef.current);
-            console.log("📡 Starting track publication...");
-            await publishTracks();
-            console.log("✅ Track publication complete");
-          } catch (err) {
-            console.error("❌ Failed to publish tracks after connect:", err);
-          }
-
-          await playerPlay().unwrap();
-        });
-
-        room.on(RoomEvent.Disconnected, () => {
-          console.log("❌ Disconnected from LiveKit");
-          setIsConnected(false);
-          setLiveKitRoom(null);
-          setPublishedTracks([]);
-          publishedTracksRef.current = [];
-        });
-
-        room.on(
-          RoomEvent.TrackSubscribed,
-          (track, _publication, participant) => {
-            console.log(
-              `📥 Track subscribed: ${track.kind} from ${participant.identity}`,
-            );
-            if (track.kind === "video") {
-              const element = track.attach();
-              const videoContainer = document.getElementById("remote-video");
-              if (videoContainer) {
-                videoContainer.innerHTML = "";
-                videoContainer.appendChild(element);
-              }
-            }
-          },
-        );
-
-        await room.connect(LIVEKIT_WS_URL, tokenData.token);
-      } catch (err) {
-        console.error("❌ Failed to start broadcast:", err);
-        alert("Не удалось начать вещание: " + (err as Error).message);
-
-        // Cleanup при ошибке
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((t) => t.stop());
-          localStreamRef.current = null;
-          setLocalStream(null);
+        try {
+          console.log("📡 Starting track publication...");
+          await publishTracks();
+          console.log("✅ Track publication complete");
+        } catch (err) {
+          console.error("❌ Failed to publish tracks after connect:", err);
         }
+
+        await playerPlay().unwrap();
+        // 🔥 FIX: устанавливаем isBroadcasting только после успешного подключения
+        setIsBroadcasting(true);
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        console.log("❌ Disconnected from LiveKit");
+        setIsConnected(false);
+        setLiveKitRoom(null);
+        setPublishedTracks([]);
+        if (publishedTracksRef.current) publishedTracksRef.current = [];
+        setIsBroadcasting(false);
+      });
+
+      room.on(
+        RoomEvent.TrackSubscribed,
+        (track, _publication, participant) => {
+          console.log(
+            `📥 Track subscribed: ${track.kind} from ${participant.identity}`,
+          );
+          if (track.kind === "video") {
+            const element = track.attach();
+            const videoContainer = document.getElementById("remote-video");
+            if (videoContainer) {
+              videoContainer.innerHTML = "";
+              videoContainer.appendChild(element);
+            }
+          }
+        },
+      );
+
+      await room.connect(LIVEKIT_WS_URL, tokenData.token);
+      
+    } catch (err) {
+      console.error("❌ Failed to start broadcast:", err);
+      alert("Не удалось начать вещание: " + (err as Error).message);
+
+      // Cleanup при ошибке
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+        setLocalStream(null);
       }
     }
-  }, [
-    isBroadcasting,
-    createLiveKitToken,
-    playerPlay,
-    playerStop,
-    publishTracks,
-    unpublishTracks,
-    liveKitRoom,
-    localStream,
-  ]);
+  }
+}, [
+  isBroadcasting,
+  createLiveKitToken,
+  playerPlay,
+  playerStop,
+  publishTracks,
+  unpublishTracks,
+  liveKitRoom,
+  localStream,
+]);
 
   const handleFileUpload = useCallback(
     async (file: File): Promise<void> => {

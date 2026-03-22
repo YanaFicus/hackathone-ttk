@@ -18,7 +18,7 @@ import type {
   RepeatMode,
 } from './types';
 
-const REST_API_BASE_URL = '/api/v1';
+const REST_API_BASE_URL = 'http://95.174.104.223:8009/api/v1';
 const API_TOKEN = 'test'; // Статический токен для API
 
 const restBaseQuery = fetchBaseQuery({

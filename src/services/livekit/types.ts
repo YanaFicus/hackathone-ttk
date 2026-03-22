@@ -3,7 +3,7 @@ export type RepeatMode = 'off' | 'track' | 'playlist';
 export type BotState = 'idle' | 'playing' | 'paused' | 'stopped';
 
 export interface LiveKitTokenRequest {
-  id: string;
+  id: string | null;
   username: string;
   role: 'user' | 'Leading' | 'endmin';
 }

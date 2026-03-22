@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { ChangePasswordRequest, GetUsersRequest, UpdateUserRequest, UserDto } from "./types";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost:7000/api/admin/users",
+  baseUrl: "http://95.174.104.223:7401/api/admin/users",
   prepareHeaders: (headers) => {
     const token = localStorage.getItem("accessToken");
     if (token) {
